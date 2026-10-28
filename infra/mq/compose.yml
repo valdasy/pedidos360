@@ -1,0 +1,49 @@
+# =========================================================
+# Pedidos360 - Broker RabbitMQ (EC2 "mq")
+#
+#   docker compose up -d                      -> levanta el broker
+#   docker compose run --rm topology-init     -> carga exchanges/colas/bindings/policies
+#   docker compose down                       -> detiene (conserva datos)
+#   docker compose down -v                    -> detiene y BORRA datos (reinicio limpio)
+# =========================================================
+name: pedidos360-mq
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.1.4-management
+    container_name: pedidos360-rabbitmq
+    hostname: rabbitmq            # el nombre del nodo (rabbit@rabbitmq) depende del hostname; fijarlo evita perder datos
+    ports:
+      - "5672:5672"               # AMQP: lo usan los microservicios
+      - "15672:15672"             # Management UI + API HTTP: lo usan personas y ms-mq-admin
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # Contenedor de un solo uso: espera a que el broker esté sano y le envía
+  # definitions.json por la API HTTP (POST /api/definitions).
+  # Está en el perfil "init" para que NO se ejecute con un simple "up".
+  topology-init:
+    image: curlimages/curl:8.16.0
+    profiles: ["init"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./definitions.json:/definitions.json:ro
+    command: >
+      -sS -f -u ${RABBITMQ_USER}:${RABBITMQ_PASS}
+      -H "content-type: application/json"
+      -X POST --data-binary @/definitions.json
+      http://rabbitmq:15672/api/definitions
+
+volumes:
+  rabbitmq_data:
