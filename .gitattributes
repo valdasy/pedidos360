@@ -1,0 +1,21 @@
+# Git normaliza los finales de línea de los archivos de texto.
+* text=auto
+
+# Scripts que se ejecutan dentro de contenedores Linux (EC2 / Docker):
+# DEBEN tener final de línea LF. Con CRLF (Windows) fallan con
+# "/bin/sh^M: bad interpreter" o "mvnw: not found".
+*.sh   text eol=lf
+mvnw   text eol=lf
+Dockerfile text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Scripts de Windows con CRLF
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# Binarios: no tocar
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.pdf  binary

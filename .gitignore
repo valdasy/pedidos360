@@ -1,0 +1,40 @@
+# =========================================================
+# Pedidos360 - .gitignore del monorepo
+# Todo lo que se lista aquí NO se sube a GitHub.
+# =========================================================
+
+# ---------- Java / Maven (microservicios Spring Boot) ----------
+# Carpeta donde Maven deja los .class y el .jar compilado
+target/
+*.class
+*.log
+hs_err_pid*
+
+# ---------- Node / React (frontend) ----------
+# Dependencias: se reinstalan con "npm install", nunca se suben
+node_modules/
+# Build de producción generado por "npm run build"
+dist/
+npm-debug.log*
+
+# ---------- Secretos y configuración local ----------
+# Contraseñas, client secrets, credenciales SMTP, AWS, etc.
+# Se versiona solo el ".env.example" (plantilla sin valores reales).
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Wallet de Oracle (si alguna vez se usa Autonomous DB)
+wallet/
+
+# ---------- IDEs ----------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# ---------- Sistema operativo ----------
+Thumbs.db
+Desktop.ini
+.DS_Store
