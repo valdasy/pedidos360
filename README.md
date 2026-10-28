@@ -39,9 +39,14 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 | `ms-pedidos360-catalog/` | Productos, stock y precios |
 | `ms-pedidos360-notify/` | Consumidor RabbitMQ (email, kitchen, invoice) |
 | `ms-pedidos360-mq-admin/` | Administración de colas y DLQ |
-| `infra/mq/` | Docker Compose de RabbitMQ + topología |
-| `infra/apps/` | Docker Compose de los microservicios |
-| `docs/` | Documentación técnica y evidencias |
+| `infra/mq/` | Docker Compose de RabbitMQ + Mailpit + topología |
+| `infra/mq-cluster/` | Clúster RabbitMQ de 2 nodos (Parte 3) |
+| `infra/db/` | Oracle Free en Docker (solo desarrollo local) |
+| `infra/apps/` | Docker Compose de los microservicios (EC2 apps) |
+| `infra/security/` | Configuración de Entra ID para los microservicios |
+| `infra/aws/` | Scripts de API Gateway, EC2 (user data) y RDS |
+| `scripts/` | Pruebas de punta a punta |
+| `docs/` | Guías de Entra ID, API Gateway, despliegue AWS y **guía de estudio** |
 
 ## Stack
 
@@ -62,10 +67,13 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 - [x] Etapa 2 — Productor `orders` y consumidor `notify` (IL 2.2)
 - [x] Etapa 3 — Administración de colas, DLQ, `mq-admin` (IL 2.3)
 - [x] Etapa 4 — Dominio: catálogo, pedidos y Oracle
-- [ ] Etapa 5 — Entra ID + frontend React con MSAL (IL 1.2)
-- [ ] Etapa 6 — Spring Security: JWT y roles
-- [ ] Etapa 7 — AWS API Gateway con JWT Authorizer (IL 1.1)
-- [ ] Etapa 8 — Despliegue en AWS EC2 (IL 1.3)
+- [x] Etapa 5 — Frontend React con MSAL (código) · [ ] configurar Entra ID → [docs/etapa5-entra-id.md](docs/etapa5-entra-id.md)
+- [x] Etapa 6 — Spring Security: JWT y roles (probado con tokens simulados)
+- [ ] Etapa 7 — AWS API Gateway con JWT Authorizer → [docs/etapa7-api-gateway.md](docs/etapa7-api-gateway.md)
+- [x] Etapa 8 — Docker y compose probados en local · [ ] desplegar en AWS → [docs/etapa8-despliegue-aws.md](docs/etapa8-despliegue-aws.md)
+- [x] Parte 3 — Clúster RabbitMQ de 2 nodos (probado en local)
+
+📚 **Para estudiar:** [docs/guia-estudio.md](docs/guia-estudio.md)
 
 ## Requisitos para levantarlo
 
@@ -86,6 +94,7 @@ cd ms-pedidos360-catalog  && ./mvnw spring-boot:run   # :8082
 cd ms-pedidos360-orders   && ./mvnw spring-boot:run   # :8081
 cd ms-pedidos360-notify   && ./mvnw spring-boot:run   # consumidor
 cd ms-pedidos360-mq-admin && ./mvnw spring-boot:run   # :8085
+cd frontend-pedidos360   && npm install && npm run dev   # :5173 (modo práctica)
 
 # 3. Pruebas
 bash scripts/probar-pedidos.sh       # ciclo de vida del pedido
