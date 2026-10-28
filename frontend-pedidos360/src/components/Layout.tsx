@@ -11,7 +11,16 @@ const MENU: { to: string; label: string; roles: Role[] }[] = [
 
 /** Layout base: menú lateral filtrado por rol + cabecera con el usuario. */
 export function Layout() {
-  const { user, logout, hasRole, mode } = useAuth()
+  const { user, logout, hasRole, mode, getToken } = useAuth()
+
+  // Para probar la API en Swagger/Postman o inspeccionar el token en https://jwt.ms
+  const copiarToken = async () => {
+    const token = await getToken()
+    if (token) {
+      await navigator.clipboard.writeText(token)
+      alert('Access token copiado. Pégalo en https://jwt.ms o en Swagger (Authorize).')
+    }
+  }
 
   return (
     <div className="layout">
@@ -44,6 +53,11 @@ export function Layout() {
               ))
             ) : (
               <span className="role-chip role-none">sin rol asignado</span>
+            )}
+            {mode === 'entra' && (
+              <button className="btn btn-ghost" onClick={copiarToken} title="Copia el access token al portapapeles">
+                Copiar token
+              </button>
             )}
             <button className="btn btn-ghost" onClick={logout}>
               Cerrar sesión
