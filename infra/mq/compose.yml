@@ -53,7 +53,14 @@ services:
     ports:
       - "1025:1025"               # SMTP: lo usa ms-notify
       - "8025:8025"               # Bandeja web
+    environment:
+      # Por defecto Mailpit usa una base temporal que se BORRA al detenerse.
+      # Con un archivo en un volumen, los correos sobreviven a reinicios.
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - mailpit_data:/data
     restart: unless-stopped
 
 volumes:
   rabbitmq_data:
+  mailpit_data:
