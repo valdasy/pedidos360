@@ -1,41 +1,69 @@
 # ms-pedidos360-orders
 
-Microservicio de pedidos. En la Etapa 2 actúa como **productor RabbitMQ**: publica
-comandos en `cmd.direct` / `cmd.topic`. En la Etapa 4 se agrega el CRUD de pedidos y
-la máquina de estados, que publicará estos mismos comandos automáticamente.
+Microservicio de pedidos: CRUD, máquina de estados, coordinación de stock (con ms-catalog)
+y publicación de comandos en RabbitMQ. Base de datos: esquema `pedidos_orders` (Oracle).
 
 - Puerto: `8081`
 - Swagger: http://localhost:8081/swagger-ui.html
 
 ## Ejecutar
 
-Requiere `infra/mq` levantado. Las credenciales se leen de `../infra/mq/.env`.
+Requiere `infra/mq`, `infra/db` y ms-catalog. Claves desde `../infra/mq/.env` y `../infra/db/.env`.
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-## Endpoints de prueba (Etapa 2)
+## Endpoints de pedidos
 
-| Método | Ruta | Publica en |
+| Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/orders/commands/email` | `cmd.direct` [`email.send`] |
-| POST | `/api/orders/commands/kitchen` | `cmd.direct` [`kitchen.ticket`] |
-| POST | `/api/orders/commands/invoice` | `cmd.direct` [`invoice.gen`] |
+| GET | `/api/orders?estado=&email=` | Listar (filtros opcionales) |
+| GET | `/api/orders/{id}` | Obtener (incluye `siguientesEstados` permitidos) |
+| GET | `/api/orders/{id}/history` | Historial de estados |
+| POST | `/api/orders` | Crear. Nombre y precio de cada ítem se toman de ms-catalog |
+| PUT | `/api/orders/{id}` | Editar (solo en CREADO) |
+| DELETE | `/api/orders/{id}` | Eliminar (solo en CREADO; si no, se cancela) |
+| PATCH | `/api/orders/{id}/status` | Cambiar estado: `{"estado":"ACEPTADO"}` |
 
-- `?priority=high` publica en `cmd.topic` con `<routing key>.high`.
-- Cabecera opcional `X-Event-Id: <uuid>` para reenviar un mismo evento (prueba de idempotencia).
+## Máquina de estados
 
-| Respuesta | Significado |
+```
+CREADO -> ACEPTADO -> EN_PREPARACION -> DESPACHADO -> ENTREGADO
+   \          \              \
+    +----------+--------------+--> CANCELADO
+```
+
+| Transición | Efecto |
 |---|---|
-| 202 Accepted | El broker **confirmó** el mensaje y quedó en una cola. El trabajo se hará después |
-| 422 | Mensaje no enrutado: ninguna cola coincide con la routing key |
-| 503 | Broker caído o sin confirmación |
+| a ACEPTADO | Descuenta stock en ms-catalog (síncrono). Si falta stock: 409 y el pedido sigue CREADO |
+| a CANCELADO desde ACEPTADO / EN_PREPARACION | Devuelve el stock en ms-catalog |
+| transición no permitida | 409 indicando a qué estados se puede ir |
 
-## Cómo funciona la publicación (`CommandPublisher`)
+"No se puede despachar sin aceptar": a DESPACHADO solo se llega desde EN_PREPARACION.
 
-1. Envuelve el payload en un `CommandEnvelope` (type, eventId, timestamp, traceId, correlationId).
-2. Publica con `RabbitTemplate.convertAndSend` como JSON persistente.
-3. Espera el **publisher confirm** del broker (máx. 5 s).
-4. Con `mandatory=true`, si ningún binding coincide el broker **devuelve** el mensaje
-   y la API responde 422 en vez de perderlo en silencio.
+## Comandos RabbitMQ (`OrderCommandDispatcher`)
+
+Se publican **después del commit** (`@TransactionalEventListener(AFTER_COMMIT)`):
+
+| Estado | Comandos |
+|---|---|
+| Todos | `EMAIL_SEND` → q.cmd.email |
+| ACEPTADO | + `KITCHEN_TICKET` → q.cmd.kitchen |
+| ENTREGADO | + `INVOICE_GEN` → q.cmd.invoice |
+
+Limitación conocida: si RabbitMQ falla justo después del commit, el comando se pierde
+(queda en el log). Mejora: patrón **Transactional Outbox**.
+
+## ¿Síncrono o asíncrono?
+
+| Interacción | Tipo | Por qué |
+|---|---|---|
+| orders → catalog (stock) | **Síncrono** (REST) | Se necesita la respuesta para decidir si se acepta |
+| orders → notify (correo, ticket, boleta) | **Asíncrono** (RabbitMQ) | Puede hacerse después; el usuario no espera |
+
+## Endpoints de prueba de mensajería (Etapa 2)
+
+`POST /api/orders/commands/{email|kitchen|invoice}`: publican comandos directamente
+(`?priority=high` usa `cmd.topic`; cabecera `X-Event-Id` para probar idempotencia).
+Responden 202 si el broker confirmó, 422 si no se enrutó, 503 si el broker no confirma.

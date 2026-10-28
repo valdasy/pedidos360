@@ -61,7 +61,7 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 - [x] Etapa 1 — RabbitMQ: topología (IL 2.1)
 - [x] Etapa 2 — Productor `orders` y consumidor `notify` (IL 2.2)
 - [x] Etapa 3 — Administración de colas, DLQ, `mq-admin` (IL 2.3)
-- [ ] Etapa 4 — Dominio: catálogo, pedidos y Oracle
+- [x] Etapa 4 — Dominio: catálogo, pedidos y Oracle
 - [ ] Etapa 5 — Entra ID + frontend React con MSAL (IL 1.2)
 - [ ] Etapa 6 — Spring Security: JWT y roles
 - [ ] Etapa 7 — AWS API Gateway con JWT Authorizer (IL 1.1)
@@ -73,3 +73,30 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 - Node.js 20+
 - Docker Desktop
 - Git
+
+## Levantar en local (Git Bash)
+
+```bash
+# 1. Infraestructura (la primera vez: cp .env.example .env en cada carpeta)
+cd infra/mq && docker compose up -d && docker compose run --rm topology-init && cd ../..
+cd infra/db && docker compose up -d && cd ../..      # esperar "DATABASE IS READY TO USE!"
+
+# 2. Microservicios, cada uno en su propia terminal
+cd ms-pedidos360-catalog  && ./mvnw spring-boot:run   # :8082
+cd ms-pedidos360-orders   && ./mvnw spring-boot:run   # :8081
+cd ms-pedidos360-notify   && ./mvnw spring-boot:run   # consumidor
+cd ms-pedidos360-mq-admin && ./mvnw spring-boot:run   # :8085
+
+# 3. Pruebas
+bash scripts/probar-pedidos.sh       # ciclo de vida del pedido
+bash scripts/probar-mensajeria.sh    # RabbitMQ: ACK, DLQ, idempotencia
+bash scripts/probar-admin.sh         # mq-admin: reproceso, alertas
+```
+
+| Servicio | URL |
+|---|---|
+| Swagger orders | http://localhost:8081/swagger-ui.html |
+| Swagger catalog | http://localhost:8082/swagger-ui.html |
+| Swagger mq-admin | http://localhost:8085/swagger-ui.html |
+| RabbitMQ | http://localhost:15672 |
+| Mailpit | http://localhost:8025 |

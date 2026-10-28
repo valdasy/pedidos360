@@ -1,0 +1,38 @@
+# =========================================================
+# Pedidos360 - Oracle Database Free (SOLO desarrollo local)
+#
+# En AWS se usa Amazon RDS for Oracle: mismos usuarios/esquemas, solo cambia
+# la URL de conexión. Este contenedor simula esa base en tu PC.
+#
+#   docker compose up -d        -> la primera vez tarda ~1-2 min en crear la BD
+#   docker compose logs -f      -> esperar "DATABASE IS READY TO USE!"
+#   docker compose down -v      -> borra la base completa
+# =========================================================
+name: pedidos360-db
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: pedidos360-oracle
+    ports:
+      # Puerto del PC configurable: si ya tienes Oracle instalado en Windows
+      # (usa 1521), pon DB_PORT=1522 en .env. Dentro del contenedor siempre es 1521.
+      - "${DB_PORT:-1521}:1521"
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD}             # clave de SYS/SYSTEM
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD}       # usadas por init/01-usuarios.sh
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      # Scripts que se ejecutan SOLO la primera vez que se crea la base
+      - ./init:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  oracle_data:
