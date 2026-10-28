@@ -28,6 +28,17 @@ correos() {
 }
 dlq() { cola "$1.dlq" | cut -d' ' -f1; }
 
+echo "== Verificación previa"
+if ! curl -s -o /dev/null --max-time 3 "$API/../../../actuator/health"; then
+  echo "  ms-orders no responde en :8081. Levántalo con ./mvnw spring-boot:run"; exit 1
+fi
+consumidores=$(docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name consumers \
+  | tr -d '\r' | awk '$1=="q.cmd.email" {print $2}')
+if [ "${consumidores:-0}" -eq 0 ]; then
+  echo "  q.cmd.email no tiene consumidores: ms-notify no está corriendo. Levántalo con ./mvnw spring-boot:run"; exit 1
+fi
+echo "  orders OK, notify conectado ($consumidores consumidor)"
+
 ok=0; fail=0
 check() {
   if [ "$2" = "$3" ]; then echo "  [OK]   $1 (=$3)"; ok=$((ok+1));
