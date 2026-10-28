@@ -31,6 +31,11 @@ for url in "$ADMIN/overview" "http://localhost:8081/actuator/health"; do
   curl -sf -o /dev/null --max-time 3 "$url" || { echo "  No responde $url"; exit 1; }
 done
 echo "  mq-admin y orders OK"
+consumidores=$(docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name consumers \
+  | tr -d '\r' | awk '$1=="q.cmd.email" {print $2}')
+if [ "${consumidores:-0}" -ne 1 ]; then
+  echo "  AVISO: q.cmd.email tiene ${consumidores:-0} consumidores; estas pruebas esperan exactamente 1 notify."
+fi
 
 echo "== 0. Preparación: purgar DLQ de email"
 curl -s -X DELETE "$ADMIN/flows/email/dlq/messages" > /dev/null

@@ -14,8 +14,9 @@ import java.util.UUID;
  * (por ejemplo, sin enviar dos correos).
  *
  * Limitación: vive en memoria, se pierde al reiniciar y no se comparte entre
- * varias instancias de notify. En producción se usaría Redis o una tabla con
- * clave única.
+ * varias instancias de notify (comprobado: con 2 instancias, un duplicado que
+ * llega a la otra instancia SÍ se procesa dos veces). En producción se usaría
+ * Redis o una tabla con clave única compartida por todas las instancias.
  */
 @Component
 public class ProcessedEventStore {

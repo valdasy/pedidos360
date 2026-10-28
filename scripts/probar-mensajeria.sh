@@ -38,6 +38,11 @@ if [ "${consumidores:-0}" -eq 0 ]; then
   echo "  q.cmd.email no tiene consumidores: ms-notify no está corriendo. Levántalo con ./mvnw spring-boot:run"; exit 1
 fi
 echo "  orders OK, notify conectado ($consumidores consumidor)"
+if [ "$consumidores" -gt 1 ]; then
+  echo "  AVISO: hay $consumidores instancias de notify. La idempotencia es en memoria de cada"
+  echo "  instancia, así que la prueba 3 (duplicado) puede fallar: el duplicado llega a otra instancia."
+  echo "  Deja una sola (p. ej. detén el notify de tu terminal si corre también en Docker)."
+fi
 
 ok=0; fail=0
 check() {

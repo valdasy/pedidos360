@@ -1,0 +1,74 @@
+# =========================================================
+# Pedidos360 - Microservicios (EC2 "apps")
+#
+#   cp .env.example .env            -> completar IPs y claves
+#   docker compose up -d --build    -> compila las imágenes y levanta todo
+#   docker compose logs -f orders   -> ver logs de un servicio
+#   docker compose ps
+#
+# RabbitMQ (+ Mailpit) corren en la EC2 "mq" (infra/mq) y Oracle en Amazon RDS
+# (o infra/db en local). Este archivo solo contiene las aplicaciones.
+# =========================================================
+name: pedidos360-apps
+
+x-common-env: &common-env
+  RABBITMQ_HOST: ${RABBITMQ_HOST}
+  RABBITMQ_USER: ${RABBITMQ_USER}
+  RABBITMQ_PASS: ${RABBITMQ_PASS}
+  SECURITY_ENABLED: ${SECURITY_ENABLED:-false}
+  ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-sin-configurar}
+  ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID:-sin-configurar}
+  TZ: America/Santiago
+
+x-db-env: &db-env
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT:-1521}
+  DB_SERVICE: ${DB_SERVICE:-FREEPDB1}
+
+services:
+  catalog:
+    build: ../../ms-pedidos360-catalog
+    image: pedidos360/catalog
+    container_name: pedidos360-catalog
+    ports:
+      - "8082:8082"
+    environment:
+      <<: [*common-env, *db-env]
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+    restart: unless-stopped
+
+  orders:
+    build: ../../ms-pedidos360-orders
+    image: pedidos360/orders
+    container_name: pedidos360-orders
+    ports:
+      - "8081:8081"
+    environment:
+      <<: [*common-env, *db-env]
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD}
+      # Dentro de la red de Docker los servicios se encuentran por nombre
+      CATALOG_URL: http://catalog:8082
+    depends_on:
+      - catalog
+    restart: unless-stopped
+
+  notify:
+    build: ../../ms-pedidos360-notify
+    image: pedidos360/notify
+    container_name: pedidos360-notify
+    # Sin puertos: solo consume de RabbitMQ (no público, como pide el caso)
+    environment:
+      <<: *common-env
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+    restart: unless-stopped
+
+  mq-admin:
+    build: ../../ms-pedidos360-mq-admin
+    image: pedidos360/mq-admin
+    container_name: pedidos360-mq-admin
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *common-env
+    restart: unless-stopped
