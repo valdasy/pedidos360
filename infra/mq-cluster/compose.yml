@@ -1,0 +1,72 @@
+# =========================================================
+# Pedidos360 - Clúster RabbitMQ de 2 nodos (Parte 3)
+#
+# Demostración en UNA máquina (tu PC o una EC2). Para 2 EC2 ver README.md.
+# Usa otros puertos para no chocar con infra/mq:
+#   nodo 1: AMQP 5682, UI http://localhost:15682
+#   nodo 2: AMQP 5683, UI http://localhost:15683
+#
+#   cp .env.example .env
+#   docker compose up -d
+#   docker compose run --rm topology-init     -> carga la misma topología
+#   docker exec pedidos360-rabbit1 rabbitmqctl cluster_status
+# =========================================================
+name: pedidos360-mq-cluster
+
+# Configuración común a los dos nodos
+x-rabbit: &rabbit
+  image: rabbitmq:4.1.4-management
+  environment:
+    RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+    RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    # Los nodos de un clúster se autentican entre sí con la misma "erlang cookie"
+    RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -setcookie ${ERLANG_COOKIE}
+    RABBITMQ_CTL_ERL_ARGS: -setcookie ${ERLANG_COOKIE}
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+  restart: unless-stopped
+
+services:
+  rabbit1:
+    <<: *rabbit
+    hostname: rabbit1                 # nombre del nodo: rabbit@rabbit1
+    container_name: pedidos360-rabbit1
+    ports: ["5682:5672", "15682:15672"]
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
+      - rabbit1_data:/var/lib/rabbitmq
+
+  rabbit2:
+    <<: *rabbit
+    hostname: rabbit2                 # nombre del nodo: rabbit@rabbit2
+    container_name: pedidos360-rabbit2
+    ports: ["5683:5672", "15683:15672"]
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-cluster.conf:ro
+      - rabbit2_data:/var/lib/rabbitmq
+    depends_on:
+      rabbit1:
+        condition: service_healthy
+
+  # Igual que en infra/mq: carga exchanges, colas, bindings y políticas.
+  # Basta con enviarlo a un nodo: la definición se replica a todo el clúster.
+  topology-init:
+    image: curlimages/curl:8.16.0
+    profiles: ["init"]
+    depends_on:
+      rabbit2:
+        condition: service_healthy
+    volumes:
+      - ../mq/definitions.json:/definitions.json:ro
+    command: >
+      -sS -f -u ${RABBITMQ_USER}:${RABBITMQ_PASS}
+      -H "content-type: application/json"
+      -X POST --data-binary @/definitions.json
+      http://rabbit1:15672/api/definitions
+
+volumes:
+  rabbit1_data:
+  rabbit2_data:
