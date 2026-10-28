@@ -5,7 +5,9 @@ import cl.duoc.pedidos360.orders.order.OrderDtos.ItemRequest;
 import cl.duoc.pedidos360.orders.order.OrderDtos.OrderRequest;
 import cl.duoc.pedidos360.orders.order.OrderDtos.OrderResponse;
 import cl.duoc.pedidos360.orders.order.OrderDtos.StatusChangeResponse;
+import cl.duoc.pedidos360.orders.security.CurrentUser;
 import cl.duoc.pedidos360.orders.shared.ConflictException;
+import cl.duoc.pedidos360.orders.shared.ForbiddenException;
 import cl.duoc.pedidos360.orders.shared.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +28,17 @@ public class OrderService {
     private final OrderRepository repository;
     private final CatalogClient catalog;
     private final ApplicationEventPublisher events;
+    private final CurrentUser currentUser;
 
     @Transactional(readOnly = true)
     public List<OrderResponse> list(OrderStatus estado, String email) {
+        // Un Cliente solo ve sus propios pedidos, sin importar qué filtro envíe
+        var cliente = currentUser.get().filter(CurrentUser.User::isOnlyCliente);
+        if (cliente.isPresent()) {
+            return repository.findByClienteEmailIgnoreCase(cliente.get().email(), NEWEST_FIRST).stream()
+                    .filter(o -> estado == null || o.getEstado() == estado)
+                    .map(OrderResponse::from).toList();
+        }
         List<Order> orders;
         if (estado != null) {
             orders = repository.findByEstado(estado, NEWEST_FIRST);
@@ -42,19 +52,22 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public OrderResponse get(Long id) {
-        return OrderResponse.from(find(id));
+        return OrderResponse.from(findAccessible(id));
     }
 
     @Transactional(readOnly = true)
     public List<StatusChangeResponse> history(Long id) {
-        return find(id).getHistorial().stream()
+        return findAccessible(id).getHistorial().stream()
                 .map(h -> new StatusChangeResponse(h.getEstadoAnterior(), h.getEstadoNuevo(), h.getCambiadoEn()))
                 .toList();
     }
 
     @Transactional
     public OrderResponse create(OrderRequest req) {
-        Order order = new Order(req.clienteNombre(), req.clienteEmail());
+        // Un Cliente siempre compra a su nombre: el email sale del token, no del formulario
+        String email = currentUser.get().filter(CurrentUser.User::isOnlyCliente)
+                .map(CurrentUser.User::email).orElse(req.clienteEmail());
+        Order order = new Order(req.clienteNombre(), email);
         order.replaceItems(toItems(req.items()));
         repository.save(order);
         events.publishEvent(OrderStatusChangedEvent.of(order));
@@ -64,14 +77,16 @@ public class OrderService {
 
     @Transactional
     public OrderResponse update(Long id, OrderRequest req) {
-        Order order = find(id);
-        order.update(req.clienteNombre(), req.clienteEmail(), toItems(req.items()));
+        Order order = findAccessible(id);
+        String email = currentUser.get().filter(CurrentUser.User::isOnlyCliente)
+                .map(CurrentUser.User::email).orElse(req.clienteEmail());
+        order.update(req.clienteNombre(), email, toItems(req.items()));
         return OrderResponse.from(order);
     }
 
     @Transactional
     public void delete(Long id) {
-        Order order = find(id);
+        Order order = findAccessible(id);
         if (order.getEstado() != OrderStatus.CREADO) {
             throw new ConflictException("Solo se puede eliminar un pedido CREADO; en otro estado debe cancelarse");
         }
@@ -86,7 +101,11 @@ public class OrderService {
      */
     @Transactional
     public OrderResponse changeStatus(Long id, OrderStatus target) {
-        Order order = find(id);
+        Order order = findAccessible(id);
+        if (currentUser.get().filter(CurrentUser.User::isOnlyCliente).isPresent()
+                && (target != OrderStatus.CANCELADO || order.getEstado() != OrderStatus.CREADO)) {
+            throw new ForbiddenException("Un cliente solo puede cancelar sus pedidos que aún no han sido aceptados");
+        }
         OrderStatus previous = order.getEstado();
         order.changeStatus(target);   // valida la transición antes de llamar a catalog
 
@@ -105,6 +124,17 @@ public class OrderService {
 
     private Order find(Long id) {
         return repository.findById(id).orElseThrow(() -> new NotFoundException("Pedido " + id + " no existe"));
+    }
+
+    /** Como find, pero un Cliente solo accede a sus propios pedidos. */
+    private Order findAccessible(Long id) {
+        Order order = find(id);
+        currentUser.get().filter(CurrentUser.User::isOnlyCliente).ifPresent(u -> {
+            if (!order.getClienteEmail().equalsIgnoreCase(u.email())) {
+                throw new ForbiddenException("El pedido " + id + " no te pertenece");
+            }
+        });
+        return order;
     }
 
     /** Toma nombre y precio vigentes del catálogo (el cliente no puede inventar precios). */

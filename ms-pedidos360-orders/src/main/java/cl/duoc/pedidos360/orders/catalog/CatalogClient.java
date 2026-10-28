@@ -1,5 +1,6 @@
 package cl.duoc.pedidos360.orders.catalog;
 
+import cl.duoc.pedidos360.orders.security.CurrentUser;
 import cl.duoc.pedidos360.orders.shared.ConflictException;
 import cl.duoc.pedidos360.orders.shared.NotFoundException;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,11 +33,20 @@ public class CatalogClient {
 
     private final RestClient http;
 
-    public CatalogClient(@Value("${pedidos360.catalog.url}") String baseUrl) {
+    public CatalogClient(@Value("${pedidos360.catalog.url}") String baseUrl, CurrentUser currentUser) {
         var timeouts = new SimpleClientHttpRequestFactory();
         timeouts.setConnectTimeout(Duration.ofSeconds(3));
         timeouts.setReadTimeout(Duration.ofSeconds(5));
-        this.http = RestClient.builder().baseUrl(baseUrl).requestFactory(timeouts).build();
+        this.http = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(timeouts)
+                // Token relay: reenvía el JWT del usuario. ms-catalog aplica sus propias
+                // reglas de rol (p. ej. solo Operador/Admin pueden descontar stock).
+                .requestInterceptor((request, body, execution) -> {
+                    currentUser.bearerToken().ifPresent(t -> request.getHeaders().setBearerAuth(t));
+                    return execution.execute(request, body);
+                })
+                .build();
     }
 
     public Product getProduct(Long id) {

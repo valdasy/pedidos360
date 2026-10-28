@@ -3,6 +3,7 @@ package cl.duoc.pedidos360.orders.controller;
 import cl.duoc.pedidos360.orders.catalog.CatalogClient.CatalogUnavailableException;
 import cl.duoc.pedidos360.orders.messaging.PublishException;
 import cl.duoc.pedidos360.orders.shared.ConflictException;
+import cl.duoc.pedidos360.orders.shared.ForbiddenException;
 import cl.duoc.pedidos360.orders.shared.NotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -22,6 +23,11 @@ public class ApiExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, e.getMessage());
         problem.setTitle("Error al publicar en RabbitMQ");
         return problem;
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ProblemDetail forbidden(ForbiddenException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
