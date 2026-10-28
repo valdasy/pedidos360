@@ -59,7 +59,7 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 
 - [x] Etapa 0 — Repositorio y entorno
 - [x] Etapa 1 — RabbitMQ: topología (IL 2.1)
-- [ ] Etapa 2 — Productor `orders` y consumidor `notify` (IL 2.2)
+- [x] Etapa 2 — Productor `orders` y consumidor `notify` (IL 2.2)
 - [ ] Etapa 3 — Administración de colas, DLQ, `mq-admin` (IL 2.3)
 - [ ] Etapa 4 — Dominio: catálogo, pedidos y Oracle
 - [ ] Etapa 5 — Entra ID + frontend React con MSAL (IL 1.2)

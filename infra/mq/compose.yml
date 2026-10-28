@@ -45,5 +45,15 @@ services:
       -X POST --data-binary @/definitions.json
       http://rabbitmq:15672/api/definitions
 
+  # Servidor SMTP falso: recibe los correos que envía ms-notify y los muestra
+  # en una bandeja web (http://localhost:8025). Ningún correo sale a internet.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: pedidos360-mailpit
+    ports:
+      - "1025:1025"               # SMTP: lo usa ms-notify
+      - "8025:8025"               # Bandeja web
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
