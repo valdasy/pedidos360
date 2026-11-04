@@ -7,6 +7,10 @@
 # =========================================================
 set -uo pipefail
 
+# Contenedor del broker: nodo 1 del clúster (infra/mq-cluster) o el broker único (infra/mq)
+RABBIT=$(docker ps --format '{{.Names}}' | grep -m1 -E '^pedidos360-(rabbit1|rabbitmq)$')
+[ -n "$RABBIT" ] || { echo "RabbitMQ no está corriendo (infra/mq-cluster o infra/mq)"; exit 1; }
+
 ADMIN=http://localhost:8085/api/mq-admin
 BASE_ORDERS=${ORDERS_URL:-http://localhost:8081}   # ORDERS_URL=http://localhost:8091 si 8081 está ocupado
 ORDERS=$BASE_ORDERS/api/orders/commands
@@ -14,7 +18,7 @@ MAILPIT=http://localhost:8025/api/v1
 J='content-type: application/json'
 
 dlq_ready() {   # tiempo real con rabbitmqctl (la API HTTP tarda ~5 s en refrescar)
-  docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name messages_ready \
+  docker exec "$RABBIT" rabbitmqctl -q list_queues name messages_ready \
     | tr -d '\r' | awk -v q="q.cmd.$1.dlq" '$1==q {print $2}'
 }
 esperar() { sleep "${1:-3}"; }
@@ -32,7 +36,7 @@ for url in "$ADMIN/overview" "$BASE_ORDERS/actuator/health"; do
   curl -sf -o /dev/null --max-time 3 "$url" || { echo "  No responde $url"; exit 1; }
 done
 echo "  mq-admin y orders OK"
-consumidores=$(docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name consumers \
+consumidores=$(docker exec "$RABBIT" rabbitmqctl -q list_queues name consumers \
   | tr -d '\r' | awk '$1=="q.cmd.email" {print $2}')
 if [ "${consumidores:-0}" -ne 1 ]; then
   echo "  AVISO: q.cmd.email tiene ${consumidores:-0} consumidores; estas pruebas esperan exactamente 1 notify."

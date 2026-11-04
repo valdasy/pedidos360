@@ -19,7 +19,7 @@ Navegador ─ HTTPS ─► CloudFront + S3 (React)                  (o frontend 
                  └──────┬──────────────────────┬────────────┘
                 AMQP 5672│ SMTP 1025      JDBC 1521│
                         ▼                         ▼
-           EC2 "mq": RabbitMQ + Mailpit     Amazon RDS for Oracle
+   EC2 "mq": clúster RabbitMQ 2 nodos + Mailpit   Amazon RDS for Oracle
 ```
 
 ## Reglas del Learner Lab que importan
@@ -37,14 +37,14 @@ Navegador ─ HTTPS ─► CloudFront + S3 (React)                  (o frontend 
 | `sg-pedidos360-apps` | 22 (SSH) | My IP |
 | | 8081, 8082, 8085 | 0.0.0.0/0 (API Gateway llama desde internet) |
 | `sg-pedidos360-mq` | 22 | My IP |
-| | 5672 (AMQP), 1025 (SMTP) | `sg-pedidos360-apps` |
-| | 15672 (UI RabbitMQ), 8025 (UI Mailpit) | My IP |
+| | 5672, 5673 (AMQP nodos 1 y 2), 15672, 15673 (Management, lo usa mq-admin), 1025 (SMTP) | `sg-pedidos360-apps` |
+| | 15672, 15673 (UI RabbitMQ), 8025 (UI Mailpit) | My IP |
 | `sg-pedidos360-db` | 1521 | `sg-pedidos360-apps` |
 
 Abrir solo los puertos necesarios es una exigencia del caso. RabbitMQ y la base **no** quedan
 expuestos a internet: solo la EC2 apps puede hablar con ellos.
 
-## Paso 2 — EC2 "mq" (RabbitMQ + Mailpit)
+## Paso 2 — EC2 "mq" (clúster RabbitMQ de 2 nodos + Mailpit)
 
 1. EC2 → **Launch instance**: name `ec2-mq`, **Amazon Linux 2023**, **t3.small**,
    key pair **vockey**, security group `sg-pedidos360-mq`, disco 20 GB.
@@ -60,7 +60,7 @@ cat ~/docker-listo.txt
    (*Settings → Developer settings → Fine-grained tokens*, solo lectura de este repo) y úsalo como clave:
 
 ```bash
-git clone https://github.com/valdasy/pedidos360.git && cd pedidos360/infra/mq
+git clone https://github.com/valdasy/pedidos360.git && cd pedidos360/infra/mq-cluster
 ```
 
 6. Configurar y levantar:
@@ -75,7 +75,9 @@ docker compose up -d && docker compose run --rm topology-init
 
 7. Anotar la **IP privada** de la instancia (EC2 → la instancia → *Private IPv4*). La usará la EC2 apps.
 
-Comprobar: `http://<IP pública ec2-mq>:15672` (UI de RabbitMQ) desde tu PC.
+Comprobar: `http://<IP pública ec2-mq>:15672` y `:15673` (UI de cada nodo) desde tu PC, y
+en la EC2: `docker exec pedidos360-rabbit1 rabbitmqctl cluster_status` (2 nodos corriendo).
+Más detalles del clúster: `infra/mq-cluster/README.md`.
 
 ## Paso 3 — Amazon RDS for Oracle
 
@@ -119,6 +121,8 @@ cp .env.example .env && nano .env
 ```
 
    - `RABBITMQ_HOST` y `SMTP_HOST` = IP privada de ec2-mq
+   - `RABBITMQ_ADDRESSES=<IP privada>:5672,<IP privada>:5673` y
+     `RABBITMQ_MANAGEMENT_URLS=http://<IP privada>:15672/api,http://<IP privada>:15673/api`
    - `DB_HOST` = endpoint de RDS, `DB_SERVICE=ORCL`
    - `SECURITY_ENABLED=true` y los IDs de Entra
 
@@ -180,7 +184,7 @@ npm run build
 
 - [ ] Learner Lab iniciado 20 min antes
 - [ ] Iniciar RDS (si estaba detenido tarda ~10 min) y las 2 EC2
-- [ ] ec2-mq: `docker compose ps` (RabbitMQ y Mailpit `Up`; tienen `restart: unless-stopped`)
+- [ ] ec2-mq: `docker compose ps` (rabbit1, rabbit2 y Mailpit `Up`; tienen `restart: unless-stopped`)
 - [ ] ec2-apps: `docker compose ps` (4 servicios `Up`)
 - [ ] `curl -i <API>/api/orders` → 401 (gateway activo)
 - [ ] Login con los 3 usuarios de Entra

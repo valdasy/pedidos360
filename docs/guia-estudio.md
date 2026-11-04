@@ -88,15 +88,25 @@ necesita un registro compartido (Redis o tabla con clave única).
 | Evitar ciclos infinitos | Máximo 3 reprocesos (`x-reprocess-count`) | idem |
 | Descartar | Purgar la DLQ | `DELETE .../dlq/messages` |
 | Alertas | Sin consumidores (CRITICAL), acumulación, DLQ con mensajes | `QueueAdminService.alerts` |
-| Clúster | 2 nodos, mismo `erlang cookie` | `infra/mq-cluster` |
+| Clúster | 2 nodos, colas repartidas, servicios con failover | `infra/mq-cluster`, `scripts/probar-cluster.sh` |
 
 **Reproceso sin pérdida, en 4 pasos:** `basicGet` sin ACK → publicar en el origen → esperar
 confirmación → **recién entonces** ACK en la DLQ. Si algo falla en medio, el mensaje vuelve
 a la DLQ. Es entrega **al menos una vez** (*at-least-once*) + idempotencia.
 
-**Pregunta típica:** *¿un clúster de 2 nodos es alta disponibilidad?* No por sí solo. Comparte
-la configuración, pero una cola classic vive en un nodo: si cae, esa cola queda `down` (lo
-probamos). La alta disponibilidad real son **quorum queues** con **3 nodos** (necesitan mayoría).
+**Pregunta típica:** *¿un clúster de 2 nodos es alta disponibilidad?* No por completo. Todo
+Pedidos360 usa el clúster: las colas están **repartidas** (email y kitchen en el nodo 1, invoice
+en el 2) y los servicios se conectan a **ambos nodos** (`spring.rabbitmq.addresses`). Probado
+(`probar-cluster.sh`): si cae un nodo, los servicios se reconectan al otro, mq-admin sigue
+respondiendo y alerta, y los flujos cuyas colas viven en el nodo vivo siguen funcionando. Pero
+las colas del nodo caído quedan **no disponibles** hasta que vuelva: una cola classic vive en un
+solo nodo. La alta disponibilidad real de las colas son **quorum queues** con **3 nodos**
+(necesitan mayoría).
+
+**Pregunta típica:** *¿qué problemas encontraron con el clúster?* (1) Spring detenía para siempre
+el listener de una cola no disponible (`missing-queues-fatal=false` lo corrige); (2) si fallaba
+el primer comando de un pedido, no se intentaban los demás (ahora se publican por separado);
+(3) gracias a los *publisher confirms*, orders sabe cuándo un comando no llegó y lo registra.
 
 ---
 
@@ -183,7 +193,7 @@ conoce las reglas de negocio (un Cliente solo cancela **sus** pedidos **no acept
 
 ## 5. Guion de demo (10 minutos)
 
-Ten abiertas pestañas: app, RabbitMQ UI, Mailpit, una terminal.
+Ten abiertas pestañas: app, RabbitMQ UI (nodo 1 y nodo 2), Mailpit, una terminal.
 
 1. **Login** con `cliente@...` → mostrar el chip "Cliente" y el menú reducido.
    Botón *Copiar token* → jwt.ms → mostrar `iss`, `aud` y `roles`. *(IL 1.2)*
@@ -197,7 +207,10 @@ Ten abiertas pestañas: app, RabbitMQ UI, Mailpit, una terminal.
 6. **DLQ:** detener Mailpit, avanzar un pedido → el mensaje termina en la DLQ tras 1 reintento →
    login `admin@...` → Colas RabbitMQ → alerta → **Ver DLQ** (`x-death`) → levantar Mailpit →
    **Reprocesar** → llega el correo. *(IL 2.3)*
-7. Cliente intenta entrar a `/admin/mq` → "Acceso denegado"; por API → 403.
+7. **Clúster (Parte 3):** en Colas RabbitMQ se ve en qué nodo vive cada cola →
+   `docker stop pedidos360-rabbit2` → alerta "Nodo caído" y q.cmd.invoice no disponible →
+   cancelar un pedido: el correo llega, la nota de crédito no → `docker start pedidos360-rabbit2`.
+8. Cliente intenta entrar a `/admin/mq` → "Acceso denegado"; por API → 403.
 
 ---
 
@@ -210,7 +223,7 @@ docker compose ps
 docker compose logs -f notify
 ```
 ```bash
-docker exec pedidos360-rabbitmq rabbitmqctl list_queues name messages_ready messages_unacknowledged consumers
+docker exec pedidos360-rabbit1 rabbitmqctl list_queues name leader messages_ready messages_unacknowledged consumers
 ```
 ```bash
 docker compose run --rm topology-init

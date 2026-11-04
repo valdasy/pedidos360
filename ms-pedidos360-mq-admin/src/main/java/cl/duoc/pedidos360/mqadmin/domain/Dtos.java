@@ -8,9 +8,18 @@ public final class Dtos {
     private Dtos() {
     }
 
-    /** Contadores de una cola. ready + unacked = total. */
-    public record QueueStatus(String name, long ready, long unacked, int consumers,
+    /**
+     * Contadores de una cola. ready + unacked = total.
+     *
+     * @param node  nodo del clúster donde vive la cola (su "leader")
+     * @param state running, o down si su nodo está caído
+     */
+    public record QueueStatus(String name, String node, String state, long ready, long unacked, int consumers,
                               double publishRate, double deliverRate) {
+
+        public boolean isRunning() {
+            return "running".equals(state);
+        }
     }
 
     public record FlowStatus(String flow, QueueStatus main, QueueStatus dlq) {

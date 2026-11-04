@@ -76,6 +76,8 @@ public class QueueAdminService {
 
     /**
      * Reglas de alerta:
+     *  - nodo del clúster caído                 -> CRITICAL
+     *  - cola no disponible (su nodo cayó)      -> CRITICAL
      *  - cola principal sin consumidores        -> CRITICAL (nadie procesa)
      *  - cola principal con mucha acumulación   -> WARNING  (consumidores lentos)
      *  - DLQ con mensajes                       -> WARNING / CRITICAL según umbral
@@ -83,10 +85,21 @@ public class QueueAdminService {
     public List<Alert> alerts() {
         var cfg = props.alerts();
         List<Alert> alerts = new ArrayList<>();
+        for (NodeStatus n : overview().nodes()) {
+            if (!n.running()) {
+                alerts.add(new Alert(Level.CRITICAL, n.name(), "Nodo del clúster caído"));
+            }
+        }
         for (FlowStatus f : flows()) {
             QueueStatus main = f.main();
             QueueStatus dlq = f.dlq();
-            if (main.consumers() == 0) {
+            for (QueueStatus q : List.of(main, dlq)) {
+                if (!q.isRunning()) {
+                    alerts.add(new Alert(Level.CRITICAL, q.name(),
+                            "Cola no disponible (" + q.state() + "): su nodo " + q.node() + " está caído"));
+                }
+            }
+            if (main.isRunning() && main.consumers() == 0) {
                 alerts.add(new Alert(Level.CRITICAL, main.name(),
                         "Sin consumidores: los mensajes se acumulan sin procesarse (" + main.ready() + " en espera)"));
             }
@@ -117,6 +130,8 @@ public class QueueAdminService {
         JsonNode q = management.queue(name);
         return new QueueStatus(
                 name,
+                q.path("node").asString(null),
+                q.path("state").asString("running"),
                 q.path("messages_ready").asLong(),
                 q.path("messages_unacknowledged").asLong(),
                 q.path("consumers").asInt(),

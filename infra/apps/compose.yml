@@ -6,13 +6,17 @@
 #   docker compose logs -f orders   -> ver logs de un servicio
 #   docker compose ps
 #
-# RabbitMQ (+ Mailpit) corren en la EC2 "mq" (infra/mq) y Oracle en Amazon RDS
+# RabbitMQ (clúster de 2 nodos + Mailpit) corre en la EC2 "mq" (infra/mq-cluster) y Oracle en Amazon RDS
 # (o infra/db en local). Este archivo solo contiene las aplicaciones.
 # =========================================================
 name: pedidos360-apps
 
 x-common-env: &common-env
   RABBITMQ_HOST: ${RABBITMQ_HOST}
+  # Clúster: lista de nodos (AMQP) y una URL de Management por nodo. Si no se definen,
+  # se usa solo RABBITMQ_HOST (un nodo).
+  RABBITMQ_ADDRESSES: ${RABBITMQ_ADDRESSES:-${RABBITMQ_HOST}:5672}
+  RABBITMQ_MANAGEMENT_URLS: ${RABBITMQ_MANAGEMENT_URLS:-http://${RABBITMQ_HOST}:15672/api}
   RABBITMQ_USER: ${RABBITMQ_USER}
   RABBITMQ_PASS: ${RABBITMQ_PASS}
   SECURITY_ENABLED: ${SECURITY_ENABLED:-false}

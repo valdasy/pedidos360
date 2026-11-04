@@ -7,6 +7,10 @@
 # =========================================================
 set -uo pipefail
 
+# Contenedor del broker: nodo 1 del clúster (infra/mq-cluster) o el broker único (infra/mq)
+RABBIT=$(docker ps --format '{{.Names}}' | grep -m1 -E '^pedidos360-(rabbit1|rabbitmq)$')
+[ -n "$RABBIT" ] || { echo "RabbitMQ no está corriendo (infra/mq-cluster o infra/mq)"; exit 1; }
+
 BASE_ORDERS=${ORDERS_URL:-http://localhost:8081}   # ORDERS_URL=http://localhost:8091 si 8081 está ocupado
 API=$BASE_ORDERS/api/orders/commands
 MAILPIT=http://localhost:8025/api/v1
@@ -17,7 +21,7 @@ post() {  # post <ruta> <json> [headers extra...] -> imprime el código HTTP
   curl -s -o /tmp/p360-resp.json -w '%{http_code}' -X POST "$API/$path" -H "$J" "$@" -d "$body"
 }
 cola() {  # cola <nombre> -> "ready unacked"
-  docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name messages_ready messages_unacknowledged \
+  docker exec "$RABBIT" rabbitmqctl -q list_queues name messages_ready messages_unacknowledged \
     | tr -d '\r' | awk -v q="$1" '$1==q {print $2, $3}'
 }
 esperar_vacia() {  # espera a que el consumidor termine de procesar la cola
@@ -33,7 +37,7 @@ echo "== Verificación previa"
 if ! curl -s -o /dev/null --max-time 3 "$API/../../../actuator/health"; then
   echo "  ms-orders no responde en :8081. Levántalo con ./mvnw spring-boot:run"; exit 1
 fi
-consumidores=$(docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name consumers \
+consumidores=$(docker exec "$RABBIT" rabbitmqctl -q list_queues name consumers \
   | tr -d '\r' | awk '$1=="q.cmd.email" {print $2}')
 if [ "${consumidores:-0}" -eq 0 ]; then
   echo "  q.cmd.email no tiene consumidores: ms-notify no está corriendo. Levántalo con ./mvnw spring-boot:run"; exit 1
@@ -52,7 +56,7 @@ check() {
 }
 
 echo "== 0. Preparación: vaciar DLQ y bandeja de Mailpit"
-for q in email kitchen invoice; do docker exec pedidos360-rabbitmq rabbitmqctl -q purge_queue "q.cmd.$q.dlq" > /dev/null; done
+for q in email kitchen invoice; do docker exec "$RABBIT" rabbitmqctl -q purge_queue "q.cmd.$q.dlq" > /dev/null; done
 curl -s -X DELETE "$MAILPIT/messages" > /dev/null
 
 echo "== 1. Flujo feliz: los 3 comandos se procesan (ACK)"

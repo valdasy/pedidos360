@@ -8,6 +8,18 @@
 # =========================================================
 set -euo pipefail
 
+# Contenedor del broker: nodo 1 del clúster (infra/mq-cluster) o el broker único (infra/mq)
+RABBIT=$(docker ps --format '{{.Names}}' | grep -m1 -E '^pedidos360-(rabbit1|rabbitmq)$')
+[ -n "$RABBIT" ] || { echo "RabbitMQ no está corriendo (infra/mq-cluster o infra/mq)"; exit 1; }
+
+# Esta prueba revisa la topología "en vacío" (como la guía Parte 1): si ms-notify está
+# consumiendo, se lleva los mensajes de prueba y los contadores no cuadran.
+if docker exec "$RABBIT" rabbitmqctl -q list_queues name consumers | tr -d '\r' \
+     | awk '$1 ~ /^q\.cmd\./ && $2 > 0 {found=1} END {exit !found}'; then
+  echo "Hay consumidores conectados (ms-notify). Detenlo antes de esta prueba: necesita las colas sin consumidores."
+  exit 1
+fi
+
 cd "$(dirname "$0")/.."
 source .env
 API="http://localhost:15672/api"
@@ -27,7 +39,7 @@ publicar() {
 # Se usa rabbitmqctl porque es tiempo real; las estadísticas de la API HTTP
 # (y de la UI) se refrescan cada ~5 segundos.
 ready() {
-  docker exec pedidos360-rabbitmq rabbitmqctl -q list_queues name messages_ready \
+  docker exec "$RABBIT" rabbitmqctl -q list_queues name messages_ready \
     | tr -d '\r' | awk -v q="$1" '$1==q {print $2}'
 }
 

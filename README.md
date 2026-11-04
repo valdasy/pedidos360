@@ -39,8 +39,8 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 | `ms-pedidos360-catalog/` | Productos, stock y precios |
 | `ms-pedidos360-notify/` | Consumidor RabbitMQ (email, kitchen, invoice) |
 | `ms-pedidos360-mq-admin/` | Administración de colas y DLQ |
-| `infra/mq/` | Docker Compose de RabbitMQ + Mailpit + topología |
-| `infra/mq-cluster/` | Clúster RabbitMQ de 2 nodos (Parte 3) |
+| `infra/mq-cluster/` | **Broker principal**: clúster RabbitMQ de 2 nodos + Mailpit (Parte 3) |
+| `infra/mq/` | Topología (`definitions.json`) y alternativa de 1 nodo |
 | `infra/db/` | Oracle Free en Docker (solo desarrollo local) |
 | `infra/apps/` | Docker Compose de los microservicios (EC2 apps) |
 | `infra/security/` | Configuración de Entra ID para los microservicios |
@@ -86,7 +86,7 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 
 ```bash
 # 1. Infraestructura (la primera vez: cp .env.example .env en cada carpeta)
-cd infra/mq && docker compose up -d && docker compose run --rm topology-init && cd ../..
+cd infra/mq-cluster && docker compose up -d && docker compose run --rm topology-init && cd ../..
 cd infra/db && docker compose up -d && cd ../..      # esperar "DATABASE IS READY TO USE!"
 
 # 2. Microservicios, cada uno en su propia terminal
@@ -100,6 +100,7 @@ cd frontend-pedidos360   && npm install && npm run dev   # :5173 (modo práctica
 bash scripts/probar-pedidos.sh       # ciclo de vida del pedido
 bash scripts/probar-mensajeria.sh    # RabbitMQ: ACK, DLQ, idempotencia
 bash scripts/probar-admin.sh         # mq-admin: reproceso, alertas
+bash scripts/probar-cluster.sh       # cae un nodo y luego el otro (~4 min)
 ```
 
 | Servicio | URL |
@@ -107,5 +108,5 @@ bash scripts/probar-admin.sh         # mq-admin: reproceso, alertas
 | Swagger orders | http://localhost:8081/swagger-ui.html |
 | Swagger catalog | http://localhost:8082/swagger-ui.html |
 | Swagger mq-admin | http://localhost:8085/swagger-ui.html |
-| RabbitMQ | http://localhost:15672 |
+| RabbitMQ nodo 1 / nodo 2 | http://localhost:15672 · http://localhost:15673 |
 | Mailpit | http://localhost:8025 |

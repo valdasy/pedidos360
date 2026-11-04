@@ -89,6 +89,7 @@ export function AdminMqPage() {
           <thead>
             <tr>
               <th>Flujo</th>
+              <th>Nodo</th>
               <th className="num">Ready</th>
               <th className="num">Unacked</th>
               <th className="num">Consumers</th>
@@ -101,6 +102,10 @@ export function AdminMqPage() {
               <tr key={f.flow}>
                 <td>
                   <code>{f.main.name}</code>
+                </td>
+                <td className={f.main.state !== 'running' ? 'danger' : ''}>
+                  {f.main.node?.replace('rabbit@', '')}
+                  {f.main.state !== 'running' && ` (${f.main.state})`}
                 </td>
                 <td className="num">{f.main.ready}</td>
                 <td className="num">{f.main.unacked}</td>

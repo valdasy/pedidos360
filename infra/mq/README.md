@@ -1,5 +1,9 @@
 # infra/mq — RabbitMQ (IL 2.1)
 
+> **El broker principal ahora es el clúster de 2 nodos (`infra/mq-cluster`)**, que carga
+> esta misma topología (`definitions.json`). Este compose queda como alternativa de 1 nodo.
+> No levantes ambos a la vez (mismos puertos).
+
 Broker RabbitMQ con la topología de comandos de Pedidos360.
 
 ## Archivos

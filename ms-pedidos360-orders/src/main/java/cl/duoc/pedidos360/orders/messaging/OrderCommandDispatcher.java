@@ -37,30 +37,38 @@ public class OrderCommandDispatcher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(OrderStatusChangedEvent e) {
         String correlationId = "pedido-" + e.pedidoId();
-        try {
-            publisher.publish(Exchanges.DIRECT, CommandType.EMAIL_SEND.routingKey(), CommandType.EMAIL_SEND,
-                    email(e), correlationId, null);
+        publish(e, Exchanges.DIRECT, CommandType.EMAIL_SEND, email(e), correlationId);
 
-            switch (e.estado()) {
-                case ACEPTADO -> publisher.publish(Exchanges.DIRECT, CommandType.KITCHEN_TICKET.routingKey(),
-                        CommandType.KITCHEN_TICKET, new KitchenTicketCommand(e.pedidoId(), e.items().stream()
-                                .map(i -> new KitchenTicketCommand.Item(i.nombre(), i.cantidad())).toList()),
-                        correlationId, null);
-                case ENTREGADO -> publisher.publish(Exchanges.DIRECT, CommandType.INVOICE_GEN.routingKey(),
-                        CommandType.INVOICE_GEN, new InvoiceCommand(e.pedidoId(), e.clienteNombre(), e.total(), "BOLETA"),
-                        correlationId, null);
-                // cmd.topic: "invoice.credit" calza con el binding "invoice.*" -> q.cmd.invoice
-                case CANCELADO -> publisher.publish(Exchanges.TOPIC, CommandType.CREDIT_NOTE_GEN.routingKey(),
-                        CommandType.CREDIT_NOTE_GEN, new CreditNoteCommand(e.pedidoId(), e.clienteNombre(),
-                                e.clienteEmail(), e.total(), "Anulación del pedido #" + e.pedidoId(),
-                                e.items().stream().map(i -> new CreditNoteCommand.Item(
-                                        i.nombre(), i.cantidad(), i.precioUnitario())).toList()),
-                        correlationId, null);
-                default -> { }
-            }
+        switch (e.estado()) {
+            case ACEPTADO -> publish(e, Exchanges.DIRECT, CommandType.KITCHEN_TICKET,
+                    new KitchenTicketCommand(e.pedidoId(), e.items().stream()
+                            .map(i -> new KitchenTicketCommand.Item(i.nombre(), i.cantidad())).toList()),
+                    correlationId);
+            case ENTREGADO -> publish(e, Exchanges.DIRECT, CommandType.INVOICE_GEN,
+                    new InvoiceCommand(e.pedidoId(), e.clienteNombre(), e.total(), "BOLETA"), correlationId);
+            // cmd.topic: "invoice.credit" calza con el binding "invoice.*" -> q.cmd.invoice
+            case CANCELADO -> publish(e, Exchanges.TOPIC, CommandType.CREDIT_NOTE_GEN,
+                    new CreditNoteCommand(e.pedidoId(), e.clienteNombre(), e.clienteEmail(), e.total(),
+                            "Anulación del pedido #" + e.pedidoId(),
+                            e.items().stream().map(i -> new CreditNoteCommand.Item(
+                                    i.nombre(), i.cantidad(), i.precioUnitario())).toList()),
+                    correlationId);
+            default -> { }
+        }
+    }
+
+    /**
+     * Cada comando se publica por separado: si uno falla (p. ej. su cola vive en un nodo
+     * del clúster que está caído), los demás igual se intentan. Comprobado: con el nodo 1
+     * caído, el correo falla pero la boleta (cola en el nodo 2) sí sale.
+     */
+    private void publish(OrderStatusChangedEvent e, String exchange, CommandType type, Object payload,
+                         String correlationId) {
+        try {
+            publisher.publish(exchange, type.routingKey(), type, payload, correlationId, null);
         } catch (RuntimeException ex) {
-            log.error("Pedido {} quedó {} pero no se pudieron publicar sus comandos: {}",
-                    e.pedidoId(), e.estado(), ex.getMessage());
+            log.error("Pedido {} quedó {} pero no se pudo publicar {}: {}",
+                    e.pedidoId(), e.estado(), type, ex.getMessage());
         }
     }
 

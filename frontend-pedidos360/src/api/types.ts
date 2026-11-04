@@ -52,6 +52,10 @@ export type ProductRequest = Omit<Product, 'id' | 'actualizadoEn'>
 
 export interface QueueStatus {
   name: string
+  /** Nodo del clúster donde vive la cola */
+  node: string | null
+  /** running, o down si su nodo está caído */
+  state: string
   ready: number
   unacked: number
   consumers: number
