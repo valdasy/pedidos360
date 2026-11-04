@@ -48,6 +48,8 @@ UI: http://localhost:15672 (usuario y clave del `.env`). AMQP: `localhost:5672`.
   incluyera usuarios, la clave quedaría en GitHub. Además, cargar definiciones al
   arrancar (`load_definitions`) desactiva la creación del usuario por defecto, que es
   la causa del error `Not_authorized` descrito en la guía Parte 2.
+- **Nota de crédito sin cambiar la topología**: ms-orders la publica en `cmd.topic` con
+  `invoice.credit`; el binding `invoice.*` ya la envía a `q.cmd.invoice`.
 - **Políticas en vez de argumentos `x-dead-letter-*`**: se pueden cambiar sin recrear
   la cola.
 - **`email.#`** en el topic (ajuste de la guía Parte 1) para aceptar `email.send.high`.

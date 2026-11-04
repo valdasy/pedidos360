@@ -8,7 +8,8 @@
 # =========================================================
 set -uo pipefail
 
-ORDERS=http://localhost:8081/api/orders
+BASE_ORDERS=${ORDERS_URL:-http://localhost:8081}   # ORDERS_URL=http://localhost:8091 si 8081 está ocupado
+ORDERS=$BASE_ORDERS/api/orders
 CATALOG=http://localhost:8082/api/catalog
 MAILPIT=http://localhost:8025/api/v1
 J='content-type: application/json'
@@ -26,6 +27,14 @@ correos_pedido() {  # cantidad de correos cuyo asunto menciona el pedido #id
   sleep 1
   curl -s "$MAILPIT/messages?limit=200" | grep -oE "\"Subject\":\"[^\"]*#$1( |\")" | wc -l | tr -d ' '
 }
+nc() { printf 'NC-%06d' "$1"; }   # número de la nota de crédito del pedido
+notas() {  # cantidad de correos con la nota de crédito del pedido <id>
+  sleep 1
+  curl -s "$MAILPIT/messages?limit=200" | grep -o "\"Subject\":\"[^\"]*$(nc "$1")" | wc -l | tr -d ' '
+}
+esperar_nota() {
+  for _ in $(seq 1 20); do [ "$(notas "$1")" -ge 1 ] && return; sleep 1; done
+}
 esperar_correos() {  # esperar_correos <id> <cantidad>
   for _ in $(seq 1 20); do [ "$(correos_pedido "$1")" -ge "$2" ] && return; sleep 1; done
 }
@@ -37,7 +46,7 @@ check() {
 }
 
 echo "== Verificación previa"
-for url in "$CATALOG/products" "http://localhost:8081/actuator/health"; do
+for url in "$CATALOG/products" "$BASE_ORDERS/actuator/health"; do
   curl -sf -o /dev/null --max-time 3 "$url" || { echo "  No responde $url"; exit 1; }
 done
 echo "  catalog y orders OK"
@@ -91,7 +100,18 @@ check "ACEPTADO -> CANCELADO" 200 "$(estado "$ID3" CANCELADO)"
 check "stock café devuelto" $((CAFE_ANTES - 2)) "$(stock 1)"
 check "CANCELADO es final -> 409" 409 "$(estado "$ID3" ACEPTADO)"
 
-echo "== 8. Validaciones"
+echo "== 8. Nota de crédito: al cancelar, notify la genera y la envía por correo"
+# Viaja por cmd.topic [invoice.credit] -> binding invoice.* -> q.cmd.invoice
+esperar_nota "$ID3"
+check "correo 'Nota de crédito $(nc "$ID3")' en Mailpit" 1 "$(notas "$ID3")"
+req POST "$ORDERS" '{"clienteNombre":"Dario","clienteEmail":"dario@ejemplo.cl","items":[{"productoId":2,"cantidad":1}]}' > /dev/null
+ID4=$(campo id)
+check "cancelar pedido CREADO (sin aceptar) -> 200" 200 "$(estado "$ID4" CANCELADO)"
+esperar_nota "$ID4"
+check "también genera nota de crédito $(nc "$ID4")" 1 "$(notas "$ID4")"
+check "pedido entregado (#$ID) NO tiene nota de crédito" 0 "$(notas "$ID")"
+
+echo "== 9. Validaciones"
 check "producto inexistente -> 404" 404 "$(req POST "$ORDERS" '{"clienteNombre":"D","clienteEmail":"d@ejemplo.cl","items":[{"productoId":9999,"cantidad":1}]}')"
 check "email inválido -> 400" 400 "$(req POST "$ORDERS" '{"clienteNombre":"D","clienteEmail":"no-es-email","items":[{"productoId":1,"cantidad":1}]}')"
 check "pedido inexistente -> 404" 404 "$(req GET "$ORDERS/999999")"

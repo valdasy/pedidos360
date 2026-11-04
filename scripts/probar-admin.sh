@@ -8,7 +8,8 @@
 set -uo pipefail
 
 ADMIN=http://localhost:8085/api/mq-admin
-ORDERS=http://localhost:8081/api/orders/commands
+BASE_ORDERS=${ORDERS_URL:-http://localhost:8081}   # ORDERS_URL=http://localhost:8091 si 8081 está ocupado
+ORDERS=$BASE_ORDERS/api/orders/commands
 MAILPIT=http://localhost:8025/api/v1
 J='content-type: application/json'
 
@@ -27,7 +28,7 @@ check() {
 }
 
 echo "== Verificación previa"
-for url in "$ADMIN/overview" "http://localhost:8081/actuator/health"; do
+for url in "$ADMIN/overview" "$BASE_ORDERS/actuator/health"; do
   curl -sf -o /dev/null --max-time 3 "$url" || { echo "  No responde $url"; exit 1; }
 done
 echo "  mq-admin y orders OK"

@@ -50,7 +50,8 @@ Se publican **después del commit** (`@TransactionalEventListener(AFTER_COMMIT)`
 |---|---|
 | Todos | `EMAIL_SEND` → q.cmd.email |
 | ACEPTADO | + `KITCHEN_TICKET` → q.cmd.kitchen |
-| ENTREGADO | + `INVOICE_GEN` → q.cmd.invoice |
+| ENTREGADO | + `INVOICE_GEN` → q.cmd.invoice (`cmd.direct [invoice.gen]`) |
+| CANCELADO | + `CREDIT_NOTE_GEN` → q.cmd.invoice (`cmd.topic [invoice.credit]`, calza con el binding `invoice.*`) |
 
 Limitación conocida: si RabbitMQ falla justo después del commit, el comando se pierde
 (queda en el log). Mejora: patrón **Transactional Outbox**.

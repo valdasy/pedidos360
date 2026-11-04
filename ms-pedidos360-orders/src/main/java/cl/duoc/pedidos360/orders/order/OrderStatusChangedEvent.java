@@ -15,11 +15,12 @@ public record OrderStatusChangedEvent(
         long total,
         List<Item> items) {
 
-    public record Item(String nombre, int cantidad) {
+    public record Item(String nombre, int cantidad, long precioUnitario) {
     }
 
     static OrderStatusChangedEvent of(Order o) {
         return new OrderStatusChangedEvent(o.getId(), o.getEstado(), o.getClienteNombre(), o.getClienteEmail(),
-                o.getTotal(), o.getItems().stream().map(i -> new Item(i.getNombre(), i.getCantidad())).toList());
+                o.getTotal(), o.getItems().stream()
+                        .map(i -> new Item(i.getNombre(), i.getCantidad(), i.getPrecioUnitario())).toList());
     }
 }

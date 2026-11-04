@@ -1,8 +1,10 @@
 package cl.duoc.pedidos360.notify.messaging;
 
+import cl.duoc.pedidos360.notify.messaging.payload.CreditNoteCommand;
 import cl.duoc.pedidos360.notify.messaging.payload.EmailCommand;
 import cl.duoc.pedidos360.notify.messaging.payload.InvoiceCommand;
 import cl.duoc.pedidos360.notify.messaging.payload.KitchenTicketCommand;
+import cl.duoc.pedidos360.notify.service.CreditNoteService;
 import cl.duoc.pedidos360.notify.service.EmailService;
 import cl.duoc.pedidos360.notify.service.InvoiceService;
 import cl.duoc.pedidos360.notify.service.KitchenService;
@@ -34,11 +36,14 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class CommandListener {
 
+    private static final String CREDIT_NOTE_GEN = "CREDIT_NOTE_GEN";
+
     private final ObjectMapper objectMapper;
     private final ProcessedEventStore processedEvents;
     private final EmailService emailService;
     private final KitchenService kitchenService;
     private final InvoiceService invoiceService;
+    private final CreditNoteService creditNoteService;
 
     @RabbitListener(queues = "q.cmd.email")
     public void onEmail(Message message, Channel channel) throws IOException {
@@ -50,9 +55,18 @@ public class CommandListener {
         handle(message, channel, new TypeReference<CommandEnvelope<KitchenTicketCommand>>() { }, kitchenService::printTicket);
     }
 
+    /**
+     * q.cmd.invoice recibe dos tipos de comando: boletas (cmd.direct [invoice.gen]) y notas de
+     * crédito (cmd.topic [invoice.credit], vía el binding "invoice.*"). Se distinguen por la
+     * propiedad AMQP "type" que pone ms-orders.
+     */
     @RabbitListener(queues = "q.cmd.invoice")
     public void onInvoice(Message message, Channel channel) throws IOException {
-        handle(message, channel, new TypeReference<CommandEnvelope<InvoiceCommand>>() { }, invoiceService::generate);
+        if (CREDIT_NOTE_GEN.equals(message.getMessageProperties().getType())) {
+            handle(message, channel, new TypeReference<CommandEnvelope<CreditNoteCommand>>() { }, creditNoteService::issue);
+        } else {
+            handle(message, channel, new TypeReference<CommandEnvelope<InvoiceCommand>>() { }, invoiceService::generate);
+        }
     }
 
     private <T> void handle(Message message, Channel channel,

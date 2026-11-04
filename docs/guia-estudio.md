@@ -61,6 +61,12 @@ consume, envía el correo y genera el ticket.
 | **AFTER_COMMIT** | Se publica solo si el pedido quedó guardado | `@TransactionalEventListener` |
 | **Prefetch** | Máximo de mensajes sin confirmar por consumidor (10) | `application.properties` de notify |
 
+**Pregunta típica:** *¿cómo agregaron la nota de crédito?* Al cancelar, orders publica
+`CREDIT_NOTE_GEN` en **cmd.topic** con routing key `invoice.credit`. El binding `invoice.*`
+que ya existía la lleva a `q.cmd.invoice`: **no hubo que tocar RabbitMQ**. Notify distingue
+boleta de nota de crédito por la propiedad AMQP `type`, genera `NC-000123` y la envía por
+correo. Esa es la ventaja de un exchange topic: variantes de un flujo sin nuevas colas.
+
 **Pregunta típica:** *¿qué pasa si notify está apagado?* Los mensajes se acumulan en *Ready*;
 orders sigue respondiendo; al levantar notify los procesa todos. (¡Demuéstralo!)
 

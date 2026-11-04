@@ -8,7 +8,13 @@ public enum CommandType {
 
     EMAIL_SEND("email.send"),
     KITCHEN_TICKET("kitchen.ticket"),
-    INVOICE_GEN("invoice.gen");
+    INVOICE_GEN("invoice.gen"),
+    /**
+     * Nota de crédito al cancelar un pedido. Es una variante del flujo de facturación:
+     * se publica en cmd.topic y el binding "invoice.*" la lleva a q.cmd.invoice,
+     * sin crear colas ni bindings nuevos.
+     */
+    CREDIT_NOTE_GEN("invoice.credit");
 
     private final String routingKey;
 

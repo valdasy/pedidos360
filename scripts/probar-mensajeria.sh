@@ -7,7 +7,8 @@
 # =========================================================
 set -uo pipefail
 
-API=http://localhost:8081/api/orders/commands
+BASE_ORDERS=${ORDERS_URL:-http://localhost:8081}   # ORDERS_URL=http://localhost:8091 si 8081 está ocupado
+API=$BASE_ORDERS/api/orders/commands
 MAILPIT=http://localhost:8025/api/v1
 J='content-type: application/json'
 

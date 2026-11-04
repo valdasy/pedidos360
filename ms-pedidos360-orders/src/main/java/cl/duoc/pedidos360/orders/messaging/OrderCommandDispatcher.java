@@ -1,5 +1,6 @@
 package cl.duoc.pedidos360.orders.messaging;
 
+import cl.duoc.pedidos360.orders.messaging.payload.CreditNoteCommand;
 import cl.duoc.pedidos360.orders.messaging.payload.EmailCommand;
 import cl.duoc.pedidos360.orders.messaging.payload.InvoiceCommand;
 import cl.duoc.pedidos360.orders.messaging.payload.KitchenTicketCommand;
@@ -15,7 +16,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  *   cualquier estado  -> EMAIL_SEND      (q.cmd.email)
  *   ACEPTADO          -> KITCHEN_TICKET  (q.cmd.kitchen)
- *   ENTREGADO         -> INVOICE_GEN     (q.cmd.invoice)
+ *   ENTREGADO         -> INVOICE_GEN     (q.cmd.invoice, vía cmd.direct [invoice.gen])
+ *   CANCELADO         -> CREDIT_NOTE_GEN (q.cmd.invoice, vía cmd.topic [invoice.credit])
  *
  * AFTER_COMMIT: solo se publica si el cambio quedó guardado en Oracle. Si la
  * transacción hace rollback, no sale ningún correo de un pedido que no existe.
@@ -46,6 +48,13 @@ public class OrderCommandDispatcher {
                         correlationId, null);
                 case ENTREGADO -> publisher.publish(Exchanges.DIRECT, CommandType.INVOICE_GEN.routingKey(),
                         CommandType.INVOICE_GEN, new InvoiceCommand(e.pedidoId(), e.clienteNombre(), e.total(), "BOLETA"),
+                        correlationId, null);
+                // cmd.topic: "invoice.credit" calza con el binding "invoice.*" -> q.cmd.invoice
+                case CANCELADO -> publisher.publish(Exchanges.TOPIC, CommandType.CREDIT_NOTE_GEN.routingKey(),
+                        CommandType.CREDIT_NOTE_GEN, new CreditNoteCommand(e.pedidoId(), e.clienteNombre(),
+                                e.clienteEmail(), e.total(), "Anulación del pedido #" + e.pedidoId(),
+                                e.items().stream().map(i -> new CreditNoteCommand.Item(
+                                        i.nombre(), i.cantidad(), i.precioUnitario())).toList()),
                         correlationId, null);
                 default -> { }
             }
