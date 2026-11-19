@@ -6,8 +6,8 @@
 #   docker compose logs -f orders   -> ver logs de un servicio
 #   docker compose ps
 #
-# RabbitMQ (clúster de 2 nodos + Mailpit) corre en la EC2 "mq" (infra/mq-cluster) y Oracle en Amazon RDS
-# (o infra/db en local). Este archivo solo contiene las aplicaciones.
+# RabbitMQ (clúster de 2 nodos + Mailpit) corre en la EC2 "mq" (infra/mq-cluster) y Oracle en la
+# EC2 "db" (infra/db; el Learner Lab bloquea RDS Oracle). Este archivo solo contiene las aplicaciones.
 # =========================================================
 name: pedidos360-apps
 

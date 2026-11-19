@@ -41,7 +41,7 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 | `ms-pedidos360-mq-admin/` | Administración de colas y DLQ |
 | `infra/mq-cluster/` | **Broker principal**: clúster RabbitMQ de 2 nodos + Mailpit (Parte 3) |
 | `infra/mq/` | Topología (`definitions.json`) y alternativa de 1 nodo |
-| `infra/db/` | Oracle Free en Docker (solo desarrollo local) |
+| `infra/db/` | Oracle Free en Docker (local y EC2 db) |
 | `infra/apps/` | Docker Compose de los microservicios (EC2 apps) |
 | `infra/security/` | Configuración de Entra ID para los microservicios |
 | `infra/aws/` | Scripts de API Gateway, EC2 (user data) y RDS |
@@ -57,7 +57,7 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 | Identidad (IDaaS) | Microsoft Entra ID |
 | API Manager | AWS API Gateway (HTTP API + JWT Authorizer) |
 | Mensajería | RabbitMQ |
-| Base de datos | Oracle (local: Docker / nube: Amazon RDS) |
+| Base de datos | Oracle Free en Docker (local y EC2; RDS Oracle bloqueado en el Learner Lab) |
 | Infraestructura | AWS EC2, Docker, Docker Compose |
 
 ## Avance
@@ -67,11 +67,15 @@ Cada carpeta `ms-*` es un **microservicio independiente**: tiene su propio
 - [x] Etapa 2 — Productor `orders` y consumidor `notify` (IL 2.2)
 - [x] Etapa 3 — Administración de colas, DLQ, `mq-admin` (IL 2.3)
 - [x] Etapa 4 — Dominio: catálogo, pedidos y Oracle
-- [x] Etapa 5 — Frontend React con MSAL (código) · [ ] configurar Entra ID → [docs/etapa5-entra-id.md](docs/etapa5-entra-id.md)
-- [x] Etapa 6 — Spring Security: JWT y roles (probado con tokens simulados)
-- [ ] Etapa 7 — AWS API Gateway con JWT Authorizer → [docs/etapa7-api-gateway.md](docs/etapa7-api-gateway.md)
-- [x] Etapa 8 — Docker y compose probados en local · [ ] desplegar en AWS → [docs/etapa8-despliegue-aws.md](docs/etapa8-despliegue-aws.md)
-- [x] Parte 3 — Clúster RabbitMQ de 2 nodos (probado en local)
+- [x] Etapa 5 — Frontend React con MSAL + Entra ID configurado (login real con roles) → [docs/etapa5-entra-id.md](docs/etapa5-entra-id.md)
+- [x] Etapa 6 — Spring Security: JWT y roles (probado con tokens reales de Entra)
+- [x] Etapa 7 — AWS API Gateway con JWT Authorizer, CORS y throttling → [docs/etapa7-api-gateway.md](docs/etapa7-api-gateway.md)
+- [x] Etapa 8 — Desplegado en AWS: 3 EC2 (apps, mq, db) + Elastic IP → [docs/etapa8-despliegue-aws.md](docs/etapa8-despliegue-aws.md)
+- [x] Parte 3 — Clúster RabbitMQ de 2 nodos (local y en AWS)
+
+**En AWS (probado de punta a punta):** login con Entra → API Gateway → microservicios en
+`ec2-apps` → Oracle en `ec2-db` y RabbitMQ en `ec2-mq` → correo en Mailpit.
+Oracle corre en una EC2 porque el Learner Lab bloquea RDS Oracle.
 
 📚 **Para estudiar:** [docs/guia-estudio.md](docs/guia-estudio.md)
 
