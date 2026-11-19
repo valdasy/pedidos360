@@ -50,7 +50,13 @@ function decodeJwt(token: string): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 export function EntraAuthProvider({ children }: { children: ReactNode }) {
   const { instance, accounts } = useMsal()
-  const account = instance.getActiveAccount() ?? accounts[0] ?? null
+  // getActiveAccount() devuelve un objeto NUEVO en cada render. Si se usara directo como
+  // dependencia, getToken cambiaría siempre y las páginas pedirían datos en bucle infinito.
+  // Se memoriza por homeAccountId (el id estable de la cuenta).
+  const current = instance.getActiveAccount() ?? accounts[0] ?? null
+  const accountId = current?.homeAccountId ?? null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const account = useMemo(() => current, [accountId])
   const [roles, setRoles] = useState<Role[]>([])
 
   const getToken = useCallback(async (): Promise<string | null> => {
