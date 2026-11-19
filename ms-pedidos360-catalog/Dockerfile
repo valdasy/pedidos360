@@ -3,7 +3,7 @@ FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
 # Primero solo el pom: si no cambian las dependencias, Docker reutiliza esta capa
 COPY .mvn .mvn
-COPY mvnw pom.xml ./
+COPY --chmod=755 mvnw pom.xml ./
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -q -B dependency:go-offline
 COPY src src
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -q -B -DskipTests package && cp target/*.jar app.jar
