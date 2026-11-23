@@ -6,6 +6,9 @@ login con Entra → API Gateway → microservicios → Oracle y RabbitMQ → cor
 Orden: Security Groups → 3 EC2 (+ Elastic IP) → RabbitMQ → Oracle → microservicios →
 API Gateway → frontend. Unas 2 horas la primera vez.
 
+> **Evaluación 3 (Kafka):** se agrega una 4.ª EC2 `ec2-kafka` y 3 microservicios en `ec2-apps`.
+> Pasos en [etapa9-kafka.md → Despliegue en AWS](etapa9-kafka.md#despliegue-en-aws-ec2-kafka).
+
 ## Arquitectura en AWS
 
 ```

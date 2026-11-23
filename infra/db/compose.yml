@@ -22,6 +22,8 @@ services:
       ORACLE_PASSWORD: ${ORACLE_PASSWORD}             # clave de SYS/SYSTEM
       ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD}       # usadas por init/01-usuarios.sh
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:-}       # init/02-usuarios-kafka.sh (Evaluación 3)
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD:-}
     volumes:
       - oracle_data:/opt/oracle/oradata
       # Scripts que se ejecutan SOLO la primera vez que se crea la base

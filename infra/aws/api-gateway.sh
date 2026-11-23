@@ -11,6 +11,7 @@
 #   /api/orders/**    -> EC2 apps :8081
 #   /api/catalog/**   -> EC2 apps :8082
 #   /api/mq-admin/**  -> EC2 apps :8085
+#   /api/audit/**, /api/report/**, /api/kafka-admin/** -> :8086, :8087, :8088 (Evaluación 3)
 # Todas las rutas exigen "Authorization: Bearer <JWT de Entra>" válido.
 # =========================================================
 set -euo pipefail
@@ -71,7 +72,7 @@ route() {  # route "<MÉTODO> <path>" <integrationId>
 echo "== 3. Rutas e integraciones"
 # Se crean rutas por método (no ANY) para que las peticiones OPTIONS (preflight CORS)
 # no exijan token: las responde API Gateway con la configuración CORS.
-for svc in "orders:8081" "catalog:8082" "mq-admin:8085"; do
+for svc in "orders:8081" "catalog:8082" "mq-admin:8085" "audit:8086" "report:8087" "kafka-admin:8088"; do
   name=${svc%%:*}; port=${svc##*:}
   base=$(integration "http://${EC2_APPS_HOST}:${port}/api/${name}")
   proxy=$(integration "http://${EC2_APPS_HOST}:${port}/api/${name}/{proxy}")

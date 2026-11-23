@@ -70,7 +70,7 @@ public class OrderService {
         Order order = new Order(req.clienteNombre(), email);
         order.replaceItems(toItems(req.items()));
         repository.save(order);
-        events.publishEvent(OrderStatusChangedEvent.of(order));
+        events.publishEvent(OrderStatusChangedEvent.of(order, null, usuario()));
         log.info("Pedido {} creado: total ${}", order.getId(), order.getTotal());
         return OrderResponse.from(order);
     }
@@ -117,9 +117,14 @@ public class OrderService {
         }
 
         repository.flush();   // fuerza el UPDATE ahora: si falla (p. ej. edición concurrente), no se publica nada
-        events.publishEvent(OrderStatusChangedEvent.of(order));
+        events.publishEvent(OrderStatusChangedEvent.of(order, previous, usuario()));
         log.info("Pedido {}: {} -> {}", id, previous, target);
         return OrderResponse.from(order);
+    }
+
+    /** Quién hizo la acción (para la auditoría). Null si la seguridad está desactivada. */
+    private String usuario() {
+        return currentUser.get().map(CurrentUser.User::email).orElse(null);
     }
 
     private Order find(Long id) {

@@ -99,3 +99,116 @@ export interface Overview {
   totalConsumers: number
   nodes: { name: string; running: boolean; memUsedMb: number; diskFreeMb: number }[]
 }
+
+// ---------------- Kafka (Evaluación 3) ----------------
+
+/** ms-report: KPIs calculados desde el tópico pedidos.eventos */
+export interface Kpis {
+  totalPedidos: number
+  pedidosPorEstado: Record<string, number>
+  ventasConfirmadas: number
+  pedidosConfirmados: number
+  ticketPromedio: number
+  cancelados: number
+  tasaCancelacion: number
+  tiempoAceptacionPromedioMin: number | null
+  tiempoEntregaPromedioMin: number | null
+  eventosProcesados: number
+}
+
+export interface TopProducto {
+  productoId: number
+  nombre: string
+  unidades: number
+  monto: number
+}
+
+export interface VentaDiaria {
+  fecha: string
+  pedidos: number
+  monto: number
+}
+
+/** ms-audit: un evento recibido desde Kafka */
+export interface AuditEvent {
+  id: number
+  eventId: string
+  tipo: string
+  entidad: 'PEDIDO' | 'PRODUCTO'
+  entidadId: number | null
+  pedidoId: number | null
+  descripcion: string
+  usuario: string | null
+  ocurridoEn: string
+  recibidoEn: string
+  topico: string
+  particion: number
+  offset: number
+}
+
+export interface AuditResumen {
+  totalEventos: number
+  porTipo: Record<string, number>
+}
+
+/** ms-kafka-admin */
+export interface KafkaCluster {
+  clusterId: string
+  controllerId: number | null
+  brokers: { id: number; host: string; port: number; rack: string | null }[]
+}
+
+export interface TopicoResumen {
+  nombre: string
+  particiones: number
+  replicas: number
+  interno: boolean
+}
+
+export interface TopicoDetalle {
+  nombre: string
+  topicId: string
+  interno: boolean
+  particiones: {
+    id: number
+    lider: number | null
+    replicas: number[]
+    isr: number[]
+    offsetInicio: number
+    offsetFin: number
+  }[]
+  configs: Record<string, string>
+  mensajes: number
+}
+
+export interface GrupoResumen {
+  grupoId: string
+  estado: string
+  tipo: string
+}
+
+export interface GrupoDetalle {
+  grupoId: string
+  estado: string
+  coordinador: string | null
+  asignador: string
+  miembros: { consumerId: string; clientId: string; host: string; particiones: string[] }[]
+  offsets: { topico: string; particion: number; offsetConfirmado: number; offsetFin: number; lag: number }[]
+  lagTotal: number
+}
+
+export interface KafkaMensaje {
+  particion: number
+  offset: number
+  clave: string | null
+  valor: string | null
+  timestamp: number
+  cabeceras: Record<string, string | null>
+}
+
+export interface CrearTopicoRequest {
+  nombre: string
+  particiones: number
+  replicas: number
+  configs?: Record<string, string>
+}

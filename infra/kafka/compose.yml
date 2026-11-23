@@ -1,0 +1,141 @@
+# =========================================================
+# Pedidos360 - Clúster Kafka: ZooKeeper + 2 brokers + Kafka UI (Evaluación 3)
+#
+#   cp .env.example .env
+#   docker compose up -d                     -> ZooKeeper, kafka1, kafka2, Kafka UI
+#   docker compose --profile init run --rm topics-init   -> crea los 4 tópicos (idempotente)
+#   docker compose logs -f kafka1
+#
+# Confluent Platform 7.9: es la última familia que trae ZooKeeper (lo pide la pauta).
+# Desde Kafka 4 / Confluent 8 se usa KRaft (sin ZooKeeper).
+#
+# Cada broker tiene DOS listeners:
+#   INTERNAL  kafka1:29092 / kafka2:29092  -> entre brokers y para Kafka UI (red de Docker)
+#   EXTERNAL  ${KAFKA_ADVERTISED_HOST}:9092 / :9093 -> microservicios (tu PC o la EC2 apps)
+# "advertised" = la dirección que el broker le dice al cliente que use. Si fuera
+# "kafka1", un microservicio fuera de esta red Docker no podría resolverla.
+# =========================================================
+name: pedidos360-kafka
+
+x-kafka-common: &kafka-common
+  image: confluentinc/cp-kafka:${CP_VERSION:-7.9.6}
+  restart: unless-stopped
+  depends_on:
+    zookeeper:
+      condition: service_healthy
+
+x-kafka-env: &kafka-env
+  KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+  KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  # Tópicos internos (offsets de consumer groups y transacciones) replicados en los 2 brokers
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  # Con 2 réplicas, min.insync=1 permite seguir escribiendo si cae un broker
+  KAFKA_MIN_INSYNC_REPLICAS: 1
+  KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+  # Los tópicos se crean a propósito (topics-init o ms-kafka-admin), nunca por un typo
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  # Memoria acotada: el laboratorio corre en una t3.medium (4 GB)
+  KAFKA_HEAP_OPTS: "-Xms384m -Xmx512m"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:${CP_VERSION:-7.9.6}
+    container_name: pedidos360-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: "-Xms128m -Xmx256m"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 | grep -q Mode"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  kafka1:
+    <<: *kafka-common
+    container_name: pedidos360-kafka1
+    hostname: kafka1
+    ports:
+      - "9092:9092"
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:-localhost}:9092
+    volumes:
+      - kafka1_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server kafka1:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  kafka2:
+    <<: *kafka-common
+    container_name: pedidos360-kafka2
+    hostname: kafka2
+    ports:
+      - "9093:9093"
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 2
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:-localhost}:9093
+    volumes:
+      - kafka2_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server kafka2:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: pedidos360-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka1:
+        condition: service_healthy
+      kafka2:
+        condition: service_healthy
+    ports:
+      # Local: solo desde tu PC. En AWS el Security Group la abre solo a tu IP.
+      - "${KAFKA_UI_BIND:-127.0.0.1}:8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: pedidos360
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:29092,kafka2:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      # Login simple para la UI (no queda abierta a cualquiera que llegue al puerto)
+      AUTH_TYPE: LOGIN_FORM
+      SPRING_SECURITY_USER_NAME: ${KAFKA_UI_USER:-admin}
+      SPRING_SECURITY_USER_PASSWORD: ${KAFKA_UI_PASS:?Falta KAFKA_UI_PASS en .env}
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+
+  # Crea los tópicos y sus DLT. Se ejecuta a mano: docker compose --profile init run --rm topics-init
+  topics-init:
+    image: confluentinc/cp-kafka:${CP_VERSION:-7.9.6}
+    profiles: ["init"]
+    depends_on:
+      kafka1:
+        condition: service_healthy
+      kafka2:
+        condition: service_healthy
+    volumes:
+      - ./crear-topicos.sh:/crear-topicos.sh:ro
+    entrypoint: ["bash", "/crear-topicos.sh"]
+
+volumes:
+  zookeeper_data:
+  zookeeper_log:
+  kafka1_data:
+  kafka2_data:

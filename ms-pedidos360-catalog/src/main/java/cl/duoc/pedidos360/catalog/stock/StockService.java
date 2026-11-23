@@ -1,6 +1,11 @@
 package cl.duoc.pedidos360.catalog.stock;
 
+import cl.duoc.pedidos360.catalog.events.InventarioEvento;
+import cl.duoc.pedidos360.catalog.events.InventarioEventoTipo;
 import cl.duoc.pedidos360.catalog.product.Product;
+import org.springframework.context.ApplicationEventPublisher;
+
+import static cl.duoc.pedidos360.catalog.events.InventarioEventPublisher.usuarioActual;
 import cl.duoc.pedidos360.catalog.product.ProductRepository;
 import cl.duoc.pedidos360.catalog.shared.ConflictException;
 import cl.duoc.pedidos360.catalog.shared.NotFoundException;
@@ -29,6 +34,8 @@ public class StockService {
 
     private final ProductRepository products;
     private final StockReservationRepository reservations;
+    /** Eventos internos: InventarioEventPublisher los envía a Kafka después del commit. */
+    private final ApplicationEventPublisher events;
 
     public record InsufficientItem(Long productoId, String nombre, int solicitado, int disponible) {
     }
@@ -62,7 +69,14 @@ public class StockService {
             throw new InsufficientStockException(missing);
         }
 
-        locked.forEach(p -> p.decreaseStock(byProduct.get(p.getId())));
+        String usuario = usuarioActual();
+        locked.forEach(p -> {
+            int anterior = p.getStock();
+            int cantidad = byProduct.get(p.getId());
+            p.decreaseStock(cantidad);
+            events.publishEvent(InventarioEvento.of(InventarioEventoTipo.STOCK_RESERVADO, p.getId(), p.getSku(),
+                    p.getNombre(), pedidoId, cantidad, anterior, p.getStock(), p.getPrecio(), usuario));
+        });
         List<Item> items = byProduct.entrySet().stream().map(e -> new Item(e.getKey(), e.getValue())).toList();
         log.info("Stock reservado para pedido {}: {}", pedidoId, items);
         return reservations.save(new StockReservation(pedidoId, items));
@@ -74,8 +88,15 @@ public class StockService {
         reservations.findById(pedidoId)
                 .filter(r -> r.getEstado() == Estado.RESERVADA)
                 .ifPresent(r -> {
+                    String usuario = usuarioActual();
                     r.getItems().forEach(i -> products.findByIdForUpdate(i.productoId())
-                            .ifPresent(p -> p.increaseStock(i.cantidad())));
+                            .ifPresent(p -> {
+                                int anterior = p.getStock();
+                                p.increaseStock(i.cantidad());
+                                events.publishEvent(InventarioEvento.of(InventarioEventoTipo.STOCK_LIBERADO,
+                                        p.getId(), p.getSku(), p.getNombre(), pedidoId, i.cantidad(), anterior,
+                                        p.getStock(), p.getPrecio(), usuario));
+                            }));
                     r.release();
                     log.info("Stock liberado para pedido {}", pedidoId);
                 });

@@ -13,6 +13,10 @@ export default defineConfig({
       '/api/orders': 'http://localhost:8081',
       '/api/catalog': 'http://localhost:8082',
       '/api/mq-admin': 'http://localhost:8085',
+      // Kafka (Evaluación 3)
+      '/api/audit': 'http://localhost:8086',
+      '/api/report': 'http://localhost:8087',
+      '/api/kafka-admin': 'http://localhost:8088',
     },
   },
 })

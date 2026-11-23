@@ -6,7 +6,10 @@ const MENU: { to: string; label: string; roles: Role[] }[] = [
   { to: '/dashboard', label: 'Inicio', roles: ['Admin', 'Operador', 'Cliente'] },
   { to: '/orders', label: 'Pedidos', roles: ['Admin', 'Operador', 'Cliente'] },
   { to: '/catalog', label: 'Catálogo', roles: ['Admin', 'Operador'] },
+  { to: '/reports', label: 'Reportes', roles: ['Admin', 'Operador'] },
+  { to: '/audit', label: 'Auditoría', roles: ['Admin'] },
   { to: '/admin/mq', label: 'Colas RabbitMQ', roles: ['Admin'] },
+  { to: '/admin/kafka', label: 'Kafka', roles: ['Admin'] },
 ]
 
 /** Layout base: menú lateral filtrado por rol + cabecera con el usuario. */

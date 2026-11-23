@@ -43,6 +43,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-amqp</artifactId>
 		</dependency>
+		<!-- Kafka: eventos de negocio para audit y report (Evaluación 3) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
 		<!-- Persistencia: JPA + Oracle + migraciones Flyway (Etapa 4) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

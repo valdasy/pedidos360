@@ -1,13 +1,16 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { RequireRole } from './components/RequireRole'
+import { AdminKafkaPage } from './pages/AdminKafkaPage'
 import { AdminMqPage } from './pages/AdminMqPage'
+import { AuditPage } from './pages/AuditPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { OrdersPage } from './pages/OrdersPage'
+import { ReportsPage } from './pages/ReportsPage'
 
-/** Rutas del caso Pedidos360 (sin /reports ni /audit: quedan fuera del alcance, usan Kafka). */
+/** Rutas del caso Pedidos360. /reports, /audit y /admin/kafka consumen los microservicios de Kafka (Evaluación 3). */
 export default function App() {
   return (
     <BrowserRouter>
@@ -27,6 +30,30 @@ export default function App() {
             element={
               <RequireRole roles={['Admin', 'Operador']}>
                 <CatalogPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <RequireRole roles={['Admin', 'Operador']}>
+                <ReportsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <RequireRole roles={['Admin']}>
+                <AuditPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/kafka"
+            element={
+              <RequireRole roles={['Admin']}>
+                <AdminKafkaPage />
               </RequireRole>
             }
           />

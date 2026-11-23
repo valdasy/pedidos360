@@ -6,8 +6,9 @@
 #   docker compose logs -f orders   -> ver logs de un servicio
 #   docker compose ps
 #
-# RabbitMQ (clúster de 2 nodos + Mailpit) corre en la EC2 "mq" (infra/mq-cluster) y Oracle en la
-# EC2 "db" (infra/db; el Learner Lab bloquea RDS Oracle). Este archivo solo contiene las aplicaciones.
+# RabbitMQ (clúster de 2 nodos + Mailpit) corre en la EC2 "mq" (infra/mq-cluster), Kafka en la
+# EC2 "kafka" (infra/kafka) y Oracle en la EC2 "db" (infra/db; el Learner Lab bloquea RDS Oracle).
+# Este archivo solo contiene las aplicaciones.
 # =========================================================
 name: pedidos360-apps
 
@@ -29,6 +30,16 @@ x-db-env: &db-env
   DB_PORT: ${DB_PORT:-1521}
   DB_SERVICE: ${DB_SERVICE:-FREEPDB1}
 
+# Kafka (Evaluación 3): brokers de la EC2 kafka (IP privada, puertos 9092 y 9093)
+x-kafka-env: &kafka-env
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092,localhost:9093}
+
+# 7 JVM en la misma EC2: se limita la memoria de cada contenedor (la JVM usa el 75 %).
+# Sin límite, cada JVM calcularía su heap sobre los 8 GB de la máquina.
+x-limits: &limits
+  mem_limit: ${APP_MEM_LIMIT:-768m}
+  restart: unless-stopped
+
 services:
   catalog:
     build: ../../ms-pedidos360-catalog
@@ -37,9 +48,9 @@ services:
     ports:
       - "8082:8082"
     environment:
-      <<: [*common-env, *db-env]
+      <<: [*common-env, *db-env, *kafka-env]
       CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD}
-    restart: unless-stopped
+    <<: *limits
 
   orders:
     build: ../../ms-pedidos360-orders
@@ -48,13 +59,13 @@ services:
     ports:
       - "8081:8081"
     environment:
-      <<: [*common-env, *db-env]
+      <<: [*common-env, *db-env, *kafka-env]
       ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD}
       # Dentro de la red de Docker los servicios se encuentran por nombre
       CATALOG_URL: http://catalog:8082
     depends_on:
       - catalog
-    restart: unless-stopped
+    <<: *limits
 
   notify:
     build: ../../ms-pedidos360-notify
@@ -65,7 +76,7 @@ services:
       <<: *common-env
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-1025}
-    restart: unless-stopped
+    <<: *limits
 
   mq-admin:
     build: ../../ms-pedidos360-mq-admin
@@ -75,4 +86,37 @@ services:
       - "8085:8085"
     environment:
       <<: *common-env
-    restart: unless-stopped
+    <<: *limits
+
+  # ---------------- Kafka (Evaluación 3) ----------------
+  audit:
+    build: ../../ms-pedidos360-audit
+    image: pedidos360/audit
+    container_name: pedidos360-audit
+    ports:
+      - "8086:8086"
+    environment:
+      <<: [*common-env, *db-env, *kafka-env]
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD}
+    <<: *limits
+
+  report:
+    build: ../../ms-pedidos360-report
+    image: pedidos360/report
+    container_name: pedidos360-report
+    ports:
+      - "8087:8087"
+    environment:
+      <<: [*common-env, *db-env, *kafka-env]
+      REPORT_DB_PASSWORD: ${REPORT_DB_PASSWORD}
+    <<: *limits
+
+  kafka-admin:
+    build: ../../ms-pedidos360-kafka-admin
+    image: pedidos360/kafka-admin
+    container_name: pedidos360-kafka-admin
+    ports:
+      - "8088:8088"
+    environment:
+      <<: [*common-env, *kafka-env]
+    <<: *limits
