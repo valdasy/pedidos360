@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -51,6 +53,9 @@ public class RepPedido {
     @Column(name = "actualizado_en", nullable = false)
     private Instant actualizadoEn;
 
+    // SUBSELECT: al leer todos los pedidos, sus ítems se cargan en UNA consulta extra
+    // (y no una por pedido, el clásico problema N+1).
+    @Fetch(FetchMode.SUBSELECT)
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<RepPedidoItem> items = new ArrayList<>();
 

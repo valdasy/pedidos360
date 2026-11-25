@@ -11,6 +11,12 @@
   --ok: #2f855a;
   --sidebar: #16213a;
   --radius: 8px;
+  /* Gráficos (rol, no rango): serie principal, su promedio y la proyección */
+  --viz-1: #86b6ef;
+  --viz-1-dark: #1c5cab;
+  --viz-2: #eb6834;
+  --viz-grid: #e9ebf0;
+  --viz-base: #c3c7d0;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -141,3 +147,48 @@ label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; co
 .nowrap { white-space: nowrap; }
 tr.selected td { background: #f3f8fe; }
 .warn { color: var(--warn); font-weight: 700; }
+
+/* ---------- Gráficos (components/charts.tsx) ---------- */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; overflow: visible; }
+.axis-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.axis-base { stroke: var(--viz-base); stroke-width: 1; }
+.axis-label { fill: var(--muted); font-size: 11px; }
+.viz-valor { fill: var(--text); font-weight: 600; }
+.viz-col { fill: var(--viz-1); transition: opacity .15s; }
+.viz-col-hoy { fill: #cde2fb; stroke: var(--viz-1); stroke-width: 1; stroke-dasharray: 2 2; }
+.viz-linea { fill: none; stroke: var(--viz-1-dark); stroke-width: 2; stroke-linejoin: round; }
+.viz-linea-punto { fill: var(--viz-1-dark); stroke: var(--surface); stroke-width: 2; }
+.viz-proy { fill: none; stroke: var(--viz-2); stroke-width: 2; stroke-dasharray: 5 4; }
+.viz-proy-punto { fill: var(--viz-2); stroke: var(--surface); stroke-width: 2; }
+.viz-banda { fill: var(--viz-2); opacity: .14; }
+.viz-divisor { stroke: var(--viz-base); stroke-dasharray: 3 3; }
+.viz-guia { stroke: var(--muted); stroke-width: 1; pointer-events: none; }
+.chart-tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgba(16, 24, 40, .12); padding: .45rem .65rem; font-size: .8rem; display: flex; flex-direction: column; gap: 2px; min-width: 150px; z-index: 5; }
+.chart-tooltip strong { text-transform: capitalize; }
+.legend { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-size: .8rem; color: var(--muted); margin-bottom: .5rem; }
+.legend-item { display: inline-flex; align-items: center; gap: .4rem; }
+.legend-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.legend-linea, .legend-punteada { width: 18px; height: 0; border-radius: 0; border-top: 2px solid; }
+.legend-punteada { border-top-style: dashed; }
+.hbars { display: flex; flex-direction: column; gap: .55rem; }
+.hbar-row { display: grid; grid-template-columns: minmax(90px, 34%) 1fr auto; align-items: center; gap: .75rem; font-size: .9rem; }
+.hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar-track { height: 12px; background: #f1f3f7; border-radius: 4px; }
+.hbar-fill { display: block; height: 100%; background: var(--viz-1); border-radius: 4px; transition: width .4s; }
+.hbar-fill.hbar-cancelado { background: #c9ccd3; }
+.hbar-value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.delta { font-size: .75rem; font-weight: 600; }
+.delta-sube { color: #1e7a46; }
+.delta-baja { color: var(--danger); }
+.delta-neutro { color: var(--muted); font-weight: 400; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: .4rem .85rem; font: inherit; font-size: .85rem; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.seg-on { background: #e5f0fb; color: var(--primary); font-weight: 600; }
+.table-scroll { max-height: 320px; overflow: auto; }
+.cierre { display: flex; flex-direction: column; gap: .6rem; }
+.cierre-cifra { display: flex; align-items: baseline; gap: .75rem; }
+.cierre-barra { display: flex; gap: 2px; height: 16px; }
+.cierre-real { background: var(--viz-1); border-radius: 4px 0 0 4px; min-width: 2px; }
+.cierre-proy { background: repeating-linear-gradient(135deg, var(--viz-2) 0 3px, #f7c4ad 3px 7px); border-radius: 0 4px 4px 0; min-width: 2px; }

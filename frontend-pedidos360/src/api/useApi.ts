@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { apiFetch } from './client'
-import type {
+import type { Analitica,
   Alert, AuditEvent, AuditResumen, CrearTopicoRequest, DlqMessage, FlowStatus, GrupoDetalle, GrupoResumen,
   KafkaCluster, KafkaMensaje, Kpis, Order, OrderRequest, OrderStatus, Overview, Product, ProductRequest,
   ReprocessResult, StatusChange, TopicoDetalle, TopicoResumen, TopProducto, VentaDiaria,
@@ -45,6 +45,8 @@ export function useApi() {
         kpis: () => call<Kpis>('/api/report/kpis'),
         topProductos: (limit = 5) => call<TopProducto[]>(`/api/report/top-productos?limit=${limit}`),
         ventasDiarias: (dias = 14) => call<VentaDiaria[]>(`/api/report/ventas-diarias?dias=${dias}`),
+        analitica: (dias = 30, proyeccion = 7) =>
+          call<Analitica>(`/api/report/analitica?dias=${dias}&proyeccion=${proyeccion}`),
       },
       audit: {
         resumen: () => call<AuditResumen>('/api/audit/resumen'),

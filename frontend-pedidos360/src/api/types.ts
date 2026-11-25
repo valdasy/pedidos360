@@ -129,6 +129,38 @@ export interface VentaDiaria {
   monto: number
 }
 
+/** ms-report /analitica: serie, proyección y distribuciones de un período */
+export interface Periodo {
+  desde: string
+  hasta: string
+  ventas: number
+  pedidos: number
+  ticketPromedio: number
+  clientes: number
+  unidades: number
+}
+
+export interface Analitica {
+  desde: string
+  hasta: string
+  serie: { fecha: string; pedidos: number; monto: number; promedioMovil7: number }[]
+  proyeccion: { fecha: string; monto: number; minimo: number; maximo: number }[]
+  pendienteDiaria: number
+  periodo: Periodo
+  periodoAnterior: Periodo
+  cierreMes: {
+    mes: string
+    ventasALaFecha: number
+    proyectadoRestante: number
+    estimadoCierre: number
+    diasTranscurridos: number
+    diasDelMes: number
+  }
+  porDiaSemana: { dia: number; nombre: string; pedidos: number; monto: number; promedioDiario: number }[]
+  porHora: { hora: number; pedidos: number; monto: number }[]
+  embudo: { creados: number; aceptados: number; entregados: number; cancelados: number }
+}
+
 /** ms-audit: un evento recibido desde Kafka */
 export interface AuditEvent {
   id: number
